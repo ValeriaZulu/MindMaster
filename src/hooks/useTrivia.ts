@@ -27,6 +27,18 @@ export const TRIVIA_LEVELS: Record<LevelConfig['id'], LevelConfig> = {
 }
 
 const TRIVIA_CACHE_PREFIX = 'mm_trivia_cache_'
+const MIN_REQUEST_INTERVAL_MS = 1500
+const REQUEST_TIMEOUT_MS = 8000
+const RETRY_DELAY_MS = 1200
+
+const inFlightRequests = new Map<LevelConfig['id'], Promise<TriviaLoadResult>>()
+const lastRequestTime = new Map<LevelConfig['id'], number>()
+
+type TriviaLoadResult = {
+    questions: TriviaQuestion[]
+    usedFallback: boolean
+    errorMessage: string | null
+}
 
 const FALLBACK_QUESTIONS: Record<Difficulty, TriviaQuestion[]> = {
     easy: [
@@ -142,43 +154,143 @@ function cacheQuestions(levelId: LevelConfig['id'], questions: TriviaQuestion[])
     saveToStorage(`${TRIVIA_CACHE_PREFIX}${levelId}`, questions)
 }
 
-async function loadTriviaQuestions(levelId: LevelConfig['id']) {
-    const level = getLevelConfig(levelId)
+function wait(delayMs: number) {
+    return new Promise<void>((resolve) => {
+        window.setTimeout(() => resolve(), delayMs)
+    })
+}
+
+async function fetchTriviaWithControl(level: LevelConfig) {
+    const controller = new AbortController()
+    const timeout = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
 
     try {
-        const response = await fetch(buildTriviaUrl(level))
-
-        if (!response.ok) {
-            throw new Error('Trivia request failed')
-        }
-
-        const data = (await response.json()) as {
-            results: Array<{
-                category: string
-                type: 'multiple'
-                difficulty: Difficulty
-                question: string
-                correct_answer: string
-                incorrect_answers: string[]
-            }>
-        }
-
-        const questions = normalizeTriviaQuestions(data.results)
-
-        cacheQuestions(levelId, questions)
-        return questions
-    } catch {
-        const cachedQuestions = getCachedQuestions(levelId)
-
-        if (cachedQuestions && cachedQuestions.length > 0) {
-            return cachedQuestions
-        }
-
-        const fallbackQuestions = buildFallbackQuestions(level.difficulty, level.amount)
-
-        cacheQuestions(levelId, fallbackQuestions)
-        return fallbackQuestions
+        return await fetch(buildTriviaUrl(level), { signal: controller.signal })
+    } finally {
+        window.clearTimeout(timeout)
     }
+}
+
+function getFallbackResult(levelId: LevelConfig['id'], level: LevelConfig, reason: string): TriviaLoadResult {
+    const cachedQuestions = getCachedQuestions(levelId)
+
+    if (cachedQuestions && cachedQuestions.length > 0) {
+        return {
+            questions: cachedQuestions,
+            usedFallback: true,
+            errorMessage: reason,
+        }
+    }
+
+    const fallbackQuestions = buildFallbackQuestions(level.difficulty, level.amount)
+
+    cacheQuestions(levelId, fallbackQuestions)
+    return {
+        questions: fallbackQuestions,
+        usedFallback: true,
+        errorMessage: reason,
+    }
+}
+
+async function loadTriviaQuestions(levelId: LevelConfig['id']) {
+    const level = getLevelConfig(levelId)
+    const now = Date.now()
+    const lastTime = lastRequestTime.get(levelId) ?? 0
+
+    if (now - lastTime < MIN_REQUEST_INTERVAL_MS) {
+        return getFallbackResult(
+            levelId,
+            level,
+            'Se usaron preguntas locales para evitar saturar la API.',
+        )
+    }
+
+    const inFlight = inFlightRequests.get(levelId)
+
+    if (inFlight) {
+        return inFlight
+    }
+
+    const requestPromise = (async (): Promise<TriviaLoadResult> => {
+        lastRequestTime.set(levelId, Date.now())
+
+        try {
+            const response = await fetchTriviaWithControl(level)
+
+            if (response.status === 429) {
+                await wait(RETRY_DELAY_MS)
+                const retryResponse = await fetchTriviaWithControl(level)
+
+                if (!retryResponse.ok) {
+                    return getFallbackResult(
+                        levelId,
+                        level,
+                        `Open Trivia devolvió ${retryResponse.status}. Usando preguntas locales.`,
+                    )
+                }
+
+                const retryData = (await retryResponse.json()) as {
+                    results: Array<{
+                        category: string
+                        type: 'multiple'
+                        difficulty: Difficulty
+                        question: string
+                        correct_answer: string
+                        incorrect_answers: string[]
+                    }>
+                }
+
+                const retryQuestions = normalizeTriviaQuestions(retryData.results)
+
+                cacheQuestions(levelId, retryQuestions)
+                return {
+                    questions: retryQuestions,
+                    usedFallback: false,
+                    errorMessage: null,
+                }
+            }
+
+            if (!response.ok) {
+                return getFallbackResult(
+                    levelId,
+                    level,
+                    `Open Trivia devolvió ${response.status}. Usando preguntas locales.`,
+                )
+            }
+
+            const data = (await response.json()) as {
+                results: Array<{
+                    category: string
+                    type: 'multiple'
+                    difficulty: Difficulty
+                    question: string
+                    correct_answer: string
+                    incorrect_answers: string[]
+                }>
+            }
+
+            const questions = normalizeTriviaQuestions(data.results)
+
+            cacheQuestions(levelId, questions)
+            return {
+                questions,
+                usedFallback: false,
+                errorMessage: null,
+            }
+        } catch {
+            return getFallbackResult(
+                levelId,
+                level,
+                'No se pudo conectar con Open Trivia. Se usan preguntas locales.',
+            )
+        } finally {
+            inFlightRequests.delete(levelId)
+        }
+    })()
+
+    inFlightRequests.set(levelId, requestPromise)
+
+    return requestPromise
 }
 
 export function useTrivia() {
@@ -191,10 +303,11 @@ export function useTrivia() {
         setError(null)
 
         try {
-            const loadedQuestions = await loadTriviaQuestions(levelId)
+            const result = await loadTriviaQuestions(levelId)
 
-            setQuestions(loadedQuestions)
-            return loadedQuestions
+            setQuestions(result.questions)
+            setError(result.errorMessage)
+            return result.questions
         } catch (requestError) {
             const message = requestError instanceof Error ? requestError.message : 'Error loading trivia'
 
