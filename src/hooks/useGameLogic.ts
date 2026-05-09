@@ -8,6 +8,9 @@ export function useGameLogic() {
     const answerCorrect = useGameStore((state) => state.answerCorrect)
     const answerIncorrect = useGameStore((state) => state.answerIncorrect)
     const setSecondsRemaining = useGameStore((state) => state.setSecondsRemaining)
+    const setRoundScore = useGameStore((state) => state.setRoundScore)
+    const setCorrectAnswers = useGameStore((state) => state.setCorrectAnswers)
+    const updateBestScore = useGameStore((state) => state.updateBestScore)
     const resetProgress = useGameStore((state) => state.resetProgress)
 
     return {
@@ -21,6 +24,9 @@ export function useGameLogic() {
         registerCorrectAnswer: answerCorrect,
         registerIncorrectAnswer: answerIncorrect,
         setSecondsRemaining,
+        setRoundScore,
+        setCorrectAnswers,
+        updateBestScore,
         resetProgress,
     }
 }

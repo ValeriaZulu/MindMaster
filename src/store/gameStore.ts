@@ -29,6 +29,9 @@ type GameStoreState = {
     answerCorrect: () => void
     answerIncorrect: () => void
     setSecondsRemaining: (secondsRemaining: number) => void
+    setRoundScore: (score: number) => void
+    setCorrectAnswers: (correctAnswers: number) => void
+    updateBestScore: (score: number) => void
     resetProgress: () => void
 }
 
@@ -155,6 +158,31 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
 
         set({ progress: nextProgress })
         saveToStorage(PROGRESS_STORAGE_KEY, nextProgress)
+    },
+    setRoundScore: (score) => {
+        const nextProgress = { ...get().progress, score }
+
+        set({ progress: nextProgress })
+        saveToStorage(PROGRESS_STORAGE_KEY, nextProgress)
+    },
+    setCorrectAnswers: (correctAnswers) => {
+        const nextProgress = { ...get().progress, correctAnswers }
+
+        set({ progress: nextProgress })
+        saveToStorage(PROGRESS_STORAGE_KEY, nextProgress)
+    },
+    updateBestScore: (score) => {
+        const user = get().user
+
+        if (!user) {
+            return
+        }
+
+        const nextBestScore = Math.max(user.bestScore, score)
+        const nextUser = { ...user, bestScore: nextBestScore }
+
+        set({ user: nextUser })
+        saveToStorage(USER_STORAGE_KEY, nextUser)
     },
     resetProgress: () => {
         const nextProgress: GameProgress = {
