@@ -1,12 +1,46 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap');
 @import "tailwindcss";
 
-@theme {
-  --color-master-dark: #080C14;
-  --color-master-purple: #9D4EDD;
-  --color-master-gold: #FFC300;
+:root {
+  --app-bg: #f6f7fb;
+  --app-surface: rgba(255, 255, 255, 0.86);
+  --app-surface-strong: #ffffff;
+  --app-text: #171520;
+  --app-muted: #686277;
+  --app-primary: #6d28ff;
+  --app-primary-strong: #4c1d95;
+  --app-accent: #69f0ae;
+  --app-border: rgba(109, 40, 255, 0.12);
+  --app-shadow: 0 18px 45px rgba(74, 29, 150, 0.10);
+  --font-sans: 'Poppins', sans-serif;
 }
 
-/* Esto asegura que el fondo ocupe TODA la pantalla */
+.dark {
+  --app-bg: #070810;
+  --app-surface: rgba(13, 17, 31, 0.88);
+  --app-surface-strong: #0f1423;
+  --app-text: #f4f1ff;
+  --app-muted: #b7b2c7;
+  --app-primary: #9a5cff;
+  --app-primary-strong: #6d28ff;
+  --app-accent: #63f2bf;
+  --app-border: rgba(154, 92, 255, 0.18);
+  --app-shadow: 0 22px 60px rgba(0, 0, 0, 0.45);
+}
+
+@theme {
+  --color-master-bg: var(--app-bg);
+  --color-master-surface: var(--app-surface);
+  --color-master-surface-strong: var(--app-surface-strong);
+  --color-master-text: var(--app-text);
+  --color-master-muted: var(--app-muted);
+  --color-master-primary: var(--app-primary);
+  --color-master-primary-strong: var(--app-primary-strong);
+  --color-master-accent: var(--app-accent);
+  --color-master-border: var(--app-border);
+  --color-master-shadow: var(--app-shadow);
+}
+
 html,
 body,
 #root {
@@ -15,6 +49,23 @@ body,
   padding: 0;
 }
 
+html {
+  background: var(--app-bg);
+  color-scheme: light;
+}
+
+html.dark {
+  color-scheme: dark;
+}
+
 body {
-  @apply bg-master-dark text-white;
+  font-family: var(--font-sans);
+  background:
+    radial-gradient(circle at top, rgba(109, 40, 255, 0.08), transparent 42%),
+    linear-gradient(180deg, var(--app-bg) 0%, var(--app-bg) 100%);
+  color: var(--app-text);
+}
+
+#root {
+  min-height: 100%;
 }
