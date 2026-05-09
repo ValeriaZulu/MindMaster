@@ -1,0 +1,20 @@
+@import "tailwindcss";
+
+@theme {
+  --color-master-dark: #080C14;
+  --color-master-purple: #9D4EDD;
+  --color-master-gold: #FFC300;
+}
+
+/* Esto asegura que el fondo ocupe TODA la pantalla */
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  @apply bg-master-dark text-white;
+}
