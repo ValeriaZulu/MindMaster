@@ -1,9 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { doc, serverTimestamp, setDoc } from 'firebase/firestore'
+import { AnimatePresence, motion } from 'framer-motion'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { MobileLayout } from '../../components/layout/MobileLayout'
+import { CoinDisplay } from '../../components/ui/CoinDisplay'
+import { PowerUpButton } from '../../components/ui/PowerUpButton'
 import { ScreenCard } from '../../components/ui/ScreenCard'
 import { useGameLogic } from '../../hooks/useGameLogic'
+import { POWER_UP_COSTS, usePowerUp } from '../../hooks/usePowerUp'
+import { useSound } from '../../hooks/useSound'
 import { TRIVIA_LEVELS, useTrivia } from '../../hooks/useTrivia'
 import { db, isFirebaseConfigured } from '../../services/firebase'
 import { useGameStore } from '../../store/gameStore'
@@ -34,6 +39,16 @@ export function GameScreen() {
     const level = TRIVIA_LEVELS[levelId as keyof typeof TRIVIA_LEVELS]
     const { questions, isLoading, error, getQuestionsForLevel } = useTrivia()
     const {
+        coins,
+        feedback: powerUpFeedback,
+        setFeedback: setPowerUpFeedback,
+        canUseFiftyFifty,
+        canUseSkipQuestion,
+        activateFiftyFifty,
+        activateSkipQuestion,
+    } = usePowerUp()
+    const { playEffect } = useSound()
+    const {
         progress,
         startLevel,
         registerCorrectAnswer,
@@ -50,6 +65,8 @@ export function GameScreen() {
     const [isResolvingAnswer, setIsResolvingAnswer] = useState(false)
     const [correctAnswersCount, setCorrectAnswersCount] = useState(0)
     const [accumulatedSeconds, setAccumulatedSeconds] = useState(0)
+    const [displayOptions, setDisplayOptions] = useState<string[]>([])
+    const [usedPowerUps, setUsedPowerUps] = useState({ fiftyFifty: false, skipQuestion: false })
     const isFinishingRound = useRef(false)
     const intervalRef = useRef<number | null>(null)
     const hasLoadedLevelRef = useRef(false)
@@ -60,6 +77,12 @@ export function GameScreen() {
         () => (currentQuestion ? shuffleOptions(currentQuestion) : []),
         [currentQuestion],
     )
+
+    useEffect(() => {
+        setDisplayOptions(currentOptions)
+        setUsedPowerUps({ fiftyFifty: false, skipQuestion: false })
+        setPowerUpFeedback(null)
+    }, [currentOptions, setPowerUpFeedback])
 
     useEffect(() => {
         if (hasLoadedLevelRef.current) {
@@ -196,14 +219,16 @@ export function GameScreen() {
 
         if (isCorrect) {
             registerCorrectAnswer()
+            playEffect('correct')
         } else {
             registerIncorrectAnswer()
+            playEffect('incorrect')
         }
 
         window.setTimeout(() => {
             void moveToNextQuestion(nextCorrectAnswers, nextSecondsRemaining, nextLives)
         }, 450)
-    }, [accumulatedSeconds, correctAnswersCount, currentQuestion, isResolvingAnswer, moveToNextQuestion, progress.lives, registerCorrectAnswer, registerIncorrectAnswer, timeLeft])
+    }, [accumulatedSeconds, correctAnswersCount, currentQuestion, isResolvingAnswer, moveToNextQuestion, playEffect, progress.lives, registerCorrectAnswer, registerIncorrectAnswer, timeLeft])
 
     useEffect(() => {
         resolveAnswerRef.current = resolveAnswer
@@ -216,9 +241,53 @@ export function GameScreen() {
         }
     }, [])
 
+    const handleUseFiftyFifty = useCallback(async () => {
+        if (!currentQuestion || isResolvingAnswer) {
+            return
+        }
+
+        const result = await activateFiftyFifty({
+            options: displayOptions,
+            correctAnswer: currentQuestion.correctAnswer,
+            alreadyUsed: usedPowerUps.fiftyFifty,
+        })
+
+        if (!result.success) {
+            return
+        }
+
+        setDisplayOptions(result.options)
+        playEffect('powerup')
+        setUsedPowerUps((previous) => ({ ...previous, fiftyFifty: true }))
+    }, [activateFiftyFifty, currentQuestion, displayOptions, isResolvingAnswer, playEffect, usedPowerUps.fiftyFifty])
+
+    const handleUseSkipQuestion = useCallback(async () => {
+        if (!currentQuestion || isResolvingAnswer || isFinishingRound.current) {
+            return
+        }
+
+        const used = await activateSkipQuestion({ alreadyUsed: usedPowerUps.skipQuestion })
+
+        if (!used) {
+            return
+        }
+
+        if (intervalRef.current) {
+            window.clearInterval(intervalRef.current)
+            intervalRef.current = null
+        }
+
+        playEffect('powerup')
+        setUsedPowerUps((previous) => ({ ...previous, skipQuestion: true }))
+        setIsResolvingAnswer(true)
+        void moveToNextQuestion(correctAnswersCount, accumulatedSeconds, progress.lives)
+    }, [accumulatedSeconds, activateSkipQuestion, correctAnswersCount, currentQuestion, isResolvingAnswer, moveToNextQuestion, playEffect, progress.lives, usedPowerUps.skipQuestion])
+
     return (
         <MobileLayout title="Pantalla de juego" subtitle={`Nivel ${level.label}`}>
             <div className="space-y-4">
+                <CoinDisplay className="w-fit" coins={coins} />
+
                 <ScreenCard title="Estado de la ronda" description="15 segundos por pregunta. Si el tiempo llega a cero, cuenta como incorrecta y avanza automáticamente.">
                     <div className="grid grid-cols-3 gap-2 text-center text-sm">
                         <div className="rounded-2xl bg-black/5 px-3 py-3 dark:bg-white/5">
@@ -245,37 +314,82 @@ export function GameScreen() {
                 ) : null}
 
                 {!isLoading && currentQuestion ? (
-                    <ScreenCard title={currentQuestion.category} description={currentQuestion.question}>
-                        <div className="space-y-3">
-                            {currentOptions.map((option) => {
-                                const isSelected = selectedAnswer === option
-                                const isCorrectOption = option === currentQuestion.correctAnswer
-                                const showCorrectState = isResolvingAnswer && isCorrectOption
-                                const showIncorrectState = isResolvingAnswer && isSelected && !isCorrectOption
+                    <AnimatePresence mode="wait">
+                        <motion.div
+                            animate={{ opacity: 1, y: 0 }}
+                            initial={{ opacity: 0, y: 14 }}
+                            key={questionIndex}
+                            transition={{ duration: 0.28 }}
+                        >
+                            <ScreenCard title={currentQuestion.category} description={currentQuestion.question}>
+                                <div className="space-y-4">
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <PowerUpButton
+                                            cost={POWER_UP_COSTS.fiftyFifty}
+                                            disabled={isResolvingAnswer || !canUseFiftyFifty}
+                                            label="50/50"
+                                            onClick={() => {
+                                                void handleUseFiftyFifty()
+                                            }}
+                                        />
+                                        <PowerUpButton
+                                            cost={POWER_UP_COSTS.skipQuestion}
+                                            disabled={isResolvingAnswer || !canUseSkipQuestion}
+                                            label="Skip"
+                                            onClick={() => {
+                                                void handleUseSkipQuestion()
+                                            }}
+                                        />
+                                    </div>
 
-                                return (
-                                    <button
-                                        key={option}
-                                        className={[
-                                            'w-full rounded-2xl border px-4 py-4 text-left font-semibold transition',
-                                            showCorrectState
-                                                ? 'border-emerald-400 bg-emerald-100/70 text-emerald-900'
-                                                : showIncorrectState
-                                                    ? 'border-rose-400 bg-rose-100/70 text-rose-900'
-                                                    : 'border-master-border bg-master-surface hover:scale-[1.01]',
-                                        ].join(' ')}
-                                        disabled={isResolvingAnswer}
-                                        onClick={() => {
-                                            void resolveAnswer(option)
-                                        }}
-                                        type="button"
-                                    >
-                                        {option}
-                                    </button>
-                                )
-                            })}
-                        </div>
-                    </ScreenCard>
+                                    {powerUpFeedback ? (
+                                        <motion.p
+                                            animate={{ opacity: 1, y: 0 }}
+                                            className={[
+                                                'rounded-xl px-3 py-2 text-sm font-semibold',
+                                                powerUpFeedback.type === 'success'
+                                                    ? 'bg-emerald-100/80 text-emerald-900'
+                                                    : powerUpFeedback.type === 'error'
+                                                        ? 'bg-rose-100/80 text-rose-900'
+                                                        : 'bg-sky-100/80 text-sky-900',
+                                            ].join(' ')}
+                                            initial={{ opacity: 0, y: -6 }}
+                                        >
+                                            {powerUpFeedback.message}
+                                        </motion.p>
+                                    ) : null}
+
+                                    {displayOptions.map((option) => {
+                                        const isSelected = selectedAnswer === option
+                                        const isCorrectOption = option === currentQuestion.correctAnswer
+                                        const showCorrectState = isResolvingAnswer && isCorrectOption
+                                        const showIncorrectState = isResolvingAnswer && isSelected && !isCorrectOption
+
+                                        return (
+                                            <button
+                                                key={option}
+                                                className={[
+                                                    'w-full rounded-2xl border px-4 py-4 text-left font-semibold transition',
+                                                    showCorrectState
+                                                        ? 'neon-glow border-emerald-400 bg-emerald-100/70 text-emerald-900'
+                                                        : showIncorrectState
+                                                            ? 'border-rose-400 bg-rose-100/70 text-rose-900'
+                                                            : 'border-master-border bg-master-surface hover:scale-[1.01]',
+                                                ].join(' ')}
+                                                disabled={isResolvingAnswer}
+                                                onClick={() => {
+                                                    void resolveAnswer(option)
+                                                }}
+                                                type="button"
+                                            >
+                                                {option}
+                                            </button>
+                                        )
+                                    })}
+                                </div>
+                            </ScreenCard>
+                        </motion.div>
+                    </AnimatePresence>
                 ) : null}
 
                 {!isLoading && !currentQuestion ? (
