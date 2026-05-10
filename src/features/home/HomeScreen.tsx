@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { MobileLayout } from '../../components/layout/MobileLayout'
+import { CoinDisplay } from '../../components/ui/CoinDisplay'
 import { ScreenCard } from '../../components/ui/ScreenCard'
 import { useGameStore } from '../../store/gameStore'
 import { useAuth } from '../../hooks/useAuth'
@@ -19,6 +20,8 @@ export function HomeScreen() {
     return (
         <MobileLayout title="Inicio" subtitle="Pantalla principal de MindMaster">
             <div className="space-y-4">
+                <CoinDisplay className="w-fit" coins={coins} />
+
                 <ScreenCard title={`Hola, ${userName || 'Usuario'}`} description="Ingresa tu nombre para crear tu sesión anónima y comenzar con 100 monedas de regalo.">
                     <form className="space-y-4" onSubmit={handleSubmit}>
                         <div className="rounded-2xl border border-master-border bg-master-surface px-4 py-3 shadow-sm">
