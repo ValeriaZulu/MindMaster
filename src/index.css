@@ -12,6 +12,8 @@
   --app-accent: #69f0ae;
   --app-border: rgba(109, 40, 255, 0.12);
   --app-shadow: 0 18px 45px rgba(74, 29, 150, 0.10);
+  --app-neon: 0 0 24px rgba(109, 40, 255, 0.32);
+  --app-grid: rgba(109, 40, 255, 0.08);
   --font-sans: 'Poppins', sans-serif;
 }
 
@@ -26,6 +28,8 @@
   --app-accent: #63f2bf;
   --app-border: rgba(154, 92, 255, 0.18);
   --app-shadow: 0 22px 60px rgba(0, 0, 0, 0.45);
+  --app-neon: 0 0 26px rgba(154, 92, 255, 0.38);
+  --app-grid: rgba(154, 92, 255, 0.14);
 }
 
 @theme {
@@ -61,11 +65,30 @@ html.dark {
 body {
   font-family: var(--font-sans);
   background:
+    linear-gradient(125deg, transparent 24%, var(--app-grid) 25%, transparent 26%),
     radial-gradient(circle at top, rgba(109, 40, 255, 0.08), transparent 42%),
     linear-gradient(180deg, var(--app-bg) 0%, var(--app-bg) 100%);
+  background-size: 26px 26px, auto, auto;
   color: var(--app-text);
+  transition: background-color 220ms ease, color 220ms ease;
 }
 
 #root {
   min-height: 100%;
+}
+
+button,
+a {
+  min-height: 44px;
+}
+
+.neon-glow {
+  box-shadow: var(--app-neon);
+}
+
+@media (max-width: 390px) {
+  .text-2xl {
+    font-size: 1.35rem;
+    line-height: 1.8rem;
+  }
 }
