@@ -22,6 +22,7 @@ export function AppRouter() {
                 <Route path="/ranking" element={<RankingScreen />} />
                 <Route path="/social" element={<SocialScreen />} />
                 <Route path="/settings" element={<SettingsScreen />} />
+                <Route path="/profile" element={<SettingsScreen />} />
                 <Route path="/credits" element={<CreditsScreen />} />
                 <Route path="*" element={<Navigate replace to="/splash" />} />
             </Routes>

@@ -1,6 +1,8 @@
 import { create } from 'zustand'
 import type { GameProgress, LevelId, ThemeMode, UserProfile } from '../types/game'
 import { loadFromStorage, saveToStorage } from '../utils/storage'
+import { db } from '../services/firebase'
+import { doc, updateDoc, arrayUnion } from 'firebase/firestore'
 
 const USER_STORAGE_KEY = 'mm_user'
 const PROGRESS_STORAGE_KEY = 'mm_progress'
@@ -26,6 +28,7 @@ type GameStoreState = {
     addCoins: (amount: number) => void
     spendCoins: (amount: number) => boolean
     startLevel: (levelId: LevelId) => void
+    completeLevel: (levelId: LevelId, score: number) => Promise<void> // Nueva función
     answerCorrect: () => void
     answerIncorrect: () => void
     setSecondsRemaining: (secondsRemaining: number) => void
@@ -41,7 +44,7 @@ const initialProgress = loadFromStorage<GameProgress>(PROGRESS_STORAGE_KEY, {
     score: 0,
     correctAnswers: 0,
     secondsRemaining: 0,
-    currentLevel: null,
+    currentLevel: 'novato', // Iniciamos en novato por defecto
 })
 const initialSettings = loadFromStorage<SettingsState>(SETTINGS_STORAGE_KEY, {
     theme: 'light',
@@ -55,69 +58,61 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     coins: initialUser?.coins ?? 100,
     progress: initialProgress,
     settings: initialSettings,
+
     setUserName: (userName) => {
         const currentUser = get().user
         const nextUser = currentUser ? { ...currentUser, displayName: userName } : null
-
         set({ userName, user: nextUser })
         saveToStorage(USER_STORAGE_KEY, nextUser)
     },
+
     setUser: (user) => {
         set({ user, userName: user?.displayName ?? '', coins: user?.coins ?? 100 })
         saveToStorage(USER_STORAGE_KEY, user)
     },
+
     setTheme: (theme) => {
         const nextSettings = { ...get().settings, theme }
-
         set({ settings: nextSettings })
         saveToStorage(SETTINGS_STORAGE_KEY, nextSettings)
     },
+
     toggleSound: () => {
         const nextSettings = { ...get().settings, soundEnabled: !get().settings.soundEnabled }
-
         set({ settings: nextSettings })
         saveToStorage(SETTINGS_STORAGE_KEY, nextSettings)
     },
+
     toggleMusic: () => {
         const nextSettings = { ...get().settings, musicEnabled: !get().settings.musicEnabled }
-
         set({ settings: nextSettings })
         saveToStorage(SETTINGS_STORAGE_KEY, nextSettings)
     },
+
     addCoins: (amount) => {
         const nextCoins = get().coins + amount
-
         set({ coins: nextCoins })
-
         const user = get().user
-
         if (user) {
             const nextUser = { ...user, coins: nextCoins }
-
             set({ user: nextUser })
             saveToStorage(USER_STORAGE_KEY, nextUser)
         }
     },
+
     spendCoins: (amount) => {
-        if (get().coins < amount) {
-            return false
-        }
-
+        if (get().coins < amount) return false
         const nextCoins = get().coins - amount
-
         set({ coins: nextCoins })
-
         const user = get().user
-
         if (user) {
             const nextUser = { ...user, coins: nextCoins }
-
             set({ user: nextUser })
             saveToStorage(USER_STORAGE_KEY, nextUser)
         }
-
         return true
     },
+
     startLevel: (levelId) => {
         const nextProgress: GameProgress = {
             ...get().progress,
@@ -127,9 +122,42 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
             secondsRemaining: 0,
             currentLevel: levelId,
         }
-
         set({ progress: nextProgress })
         saveToStorage(PROGRESS_STORAGE_KEY, nextProgress)
+    },
+
+    // IMPLEMENTACIÓN COMPLETA DE PROGRESIÓN
+    completeLevel: async (levelId, score) => {
+        const { user, progress, coins } = get()
+        // Verificamos que el usuario y su ID existan para evitar errores
+        if (!user || !user.uid) return
+
+        const levelOrder: LevelId[] = ['novato', 'aprendiz', 'experto']
+        const currentIndex = levelOrder.indexOf(levelId)
+        const nextLevelId = levelOrder[currentIndex + 1] || levelId
+
+        const nextCoins = coins + 50
+        const nextBestScore = Math.max(user.bestScore, score)
+
+        const nextUser = { ...user, bestScore: nextBestScore, coins: nextCoins }
+        const nextProgress = { ...progress, currentLevel: nextLevelId }
+
+        set({ user: nextUser, progress: nextProgress, coins: nextCoins })
+        saveToStorage(USER_STORAGE_KEY, nextUser)
+        saveToStorage(PROGRESS_STORAGE_KEY, nextProgress)
+
+        try {
+            // Usamos la exclamación db! para el error de Firestore
+            const userRef = doc(db!, 'users', user.uid)
+            await updateDoc(userRef, {
+                bestScore: nextBestScore,
+                coins: nextCoins,
+                currentLevel: nextLevelId,
+                completedLevels: arrayUnion(levelId)
+            })
+        } catch (e) {
+            console.error("Error sincronizando:", e)
+        }
     },
     answerCorrect: () => {
         const currentProgress = get().progress
@@ -138,70 +166,54 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
             correctAnswers: currentProgress.correctAnswers + 1,
             score: currentProgress.score + 100,
         }
-
         set({ progress: nextProgress })
         saveToStorage(PROGRESS_STORAGE_KEY, nextProgress)
     },
+
     answerIncorrect: () => {
         const currentProgress = get().progress
         const nextLives = Math.max(0, currentProgress.lives - 1)
-        const nextProgress: GameProgress = {
-            ...currentProgress,
-            lives: nextLives,
-        }
-
+        const nextProgress: GameProgress = { ...currentProgress, lives: nextLives }
         set({ progress: nextProgress })
         saveToStorage(PROGRESS_STORAGE_KEY, nextProgress)
     },
+
     setSecondsRemaining: (secondsRemaining) => {
         const nextProgress = { ...get().progress, secondsRemaining }
-
         set({ progress: nextProgress })
         saveToStorage(PROGRESS_STORAGE_KEY, nextProgress)
     },
+
     setRoundScore: (score) => {
         const nextProgress = { ...get().progress, score }
-
         set({ progress: nextProgress })
         saveToStorage(PROGRESS_STORAGE_KEY, nextProgress)
     },
+
     setCorrectAnswers: (correctAnswers) => {
         const nextProgress = { ...get().progress, correctAnswers }
-
         set({ progress: nextProgress })
         saveToStorage(PROGRESS_STORAGE_KEY, nextProgress)
     },
+
     updateBestScore: (score) => {
         const user = get().user
-
-        if (!user) {
-            return
-        }
-
+        if (!user) return
         const nextBestScore = Math.max(user.bestScore, score)
         const nextUser = { ...user, bestScore: nextBestScore }
-
         set({ user: nextUser })
         saveToStorage(USER_STORAGE_KEY, nextUser)
     },
+
     resetProgress: () => {
         const nextProgress: GameProgress = {
             lives: 3,
             score: 0,
             correctAnswers: 0,
             secondsRemaining: 0,
-            currentLevel: null,
+            currentLevel: 'novato',
         }
-
         set({ progress: nextProgress })
         saveToStorage(PROGRESS_STORAGE_KEY, nextProgress)
     },
 }))
-
-export function persistCurrentState() {
-    const { user, progress, settings } = useGameStore.getState()
-
-    saveToStorage(USER_STORAGE_KEY, user)
-    saveToStorage(PROGRESS_STORAGE_KEY, progress)
-    saveToStorage(SETTINGS_STORAGE_KEY, settings)
-}

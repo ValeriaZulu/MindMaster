@@ -3,6 +3,7 @@
 
 :root {
   --app-bg: #f6f7fb;
+  --master-dark: #0b0b12;
   --app-surface: rgba(255, 255, 255, 0.86);
   --app-surface-strong: #ffffff;
   --app-text: #171520;
@@ -19,6 +20,7 @@
 
 .dark {
   --app-bg: #070810;
+  --master-dark: #05060a;
   --app-surface: rgba(13, 17, 31, 0.88);
   --app-surface-strong: #0f1423;
   --app-text: #f4f1ff;
@@ -73,6 +75,18 @@ body {
   transition: background-color 220ms ease, color 220ms ease;
 }
 
+/* Dark-mode gaming tweaks */
+html.dark body {
+  background: radial-gradient(circle at top, rgba(154, 92, 255, 0.06), transparent 42%), linear-gradient(180deg, var(--master-dark) 0%, var(--master-dark) 100%);
+}
+
+.dark .rounded-[1.75rem],
+.dark .rounded-2xl,
+.dark .rounded-full {
+  border-color: rgba(154, 92, 255, 0.18);
+  box-shadow: 0 8px 30px rgba(154, 92, 255, 0.08), var(--app-neon);
+}
+
 #root {
   min-height: 100%;
 }
@@ -84,6 +98,10 @@ a {
 
 .neon-glow {
   box-shadow: var(--app-neon);
+}
+
+.shadow-neon {
+  box-shadow: var(--app-neon), 0 6px 18px rgba(0, 0, 0, 0.12);
 }
 
 @media (max-width: 390px) {

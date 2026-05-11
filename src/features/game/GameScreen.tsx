@@ -1,410 +1,411 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { doc, serverTimestamp, setDoc } from 'firebase/firestore'
-import { AnimatePresence, motion } from 'framer-motion'
-import { Link, useNavigate, useParams } from 'react-router-dom'
-import { MobileLayout } from '../../components/layout/MobileLayout'
-import { CoinDisplay } from '../../components/ui/CoinDisplay'
-import { PowerUpButton } from '../../components/ui/PowerUpButton'
-import { ScreenCard } from '../../components/ui/ScreenCard'
-import { useGameLogic } from '../../hooks/useGameLogic'
-import { POWER_UP_COSTS, usePowerUp } from '../../hooks/usePowerUp'
-import { useSound } from '../../hooks/useSound'
-import { TRIVIA_LEVELS, useTrivia } from '../../hooks/useTrivia'
-import { db, isFirebaseConfigured } from '../../services/firebase'
-import { useGameStore } from '../../store/gameStore'
-import type { LevelId, TriviaQuestion } from '../../types/game'
-import { calculateScore } from '../../utils/scoring'
+import { useCallback, useEffect, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import { motion } from 'framer-motion';
+import { useGameLogic } from '../../hooks/useGameLogic';
+import { usePowerUp } from '../../hooks/usePowerUp';
+import { useSound } from '../../hooks/useSound';
+import { TRIVIA_LEVELS, useTrivia } from '../../hooks/useTrivia';
+import type { LevelId } from '../../types/game';
 
-const QUESTION_TIME_SECONDS = 15
-
-function shuffleOptions(question: TriviaQuestion) {
-    const options = [question.correctAnswer, ...question.incorrectAnswers]
-
-    for (let index = options.length - 1; index > 0; index -= 1) {
-        const randomIndex = Math.floor(Math.random() * (index + 1))
-        const temp = options[index]
-
-        options[index] = options[randomIndex]
-        options[randomIndex] = temp
-    }
-
-    return options
-}
+const QUESTION_TIME_SECONDS = 15;
 
 export function GameScreen() {
-    const navigate = useNavigate()
-    const params = useParams()
-    const user = useGameStore((state) => state.user)
-    const levelId = params.levelId && params.levelId in TRIVIA_LEVELS ? (params.levelId as LevelId) : 'novato'
-    const level = TRIVIA_LEVELS[levelId as keyof typeof TRIVIA_LEVELS]
-    const { questions, isLoading, error, getQuestionsForLevel } = useTrivia()
-    const {
-        coins,
-        feedback: powerUpFeedback,
-        setFeedback: setPowerUpFeedback,
-        canUseFiftyFifty,
-        canUseSkipQuestion,
-        activateFiftyFifty,
-        activateSkipQuestion,
-    } = usePowerUp()
-    const { playEffect } = useSound()
+    const navigate = useNavigate();
+    const params = useParams();
+
+    const levelId =
+        params.levelId && params.levelId in TRIVIA_LEVELS
+            ? (params.levelId as LevelId)
+            : 'novato';
+
+    const level = TRIVIA_LEVELS[levelId as keyof typeof TRIVIA_LEVELS];
+
+    const { questions, isLoading, getQuestionsForLevel } = useTrivia();
+
+    const { coins, activateFiftyFifty, activateSkipQuestion } = usePowerUp();
+
+    const { playEffect } = useSound();
+
+    const game = useGameLogic();
+
     const {
         progress,
-        startLevel,
         registerCorrectAnswer,
         registerIncorrectAnswer,
-        setSecondsRemaining,
-        setRoundScore,
-        setCorrectAnswers,
-        updateBestScore,
-    } = useGameLogic()
+        startLevel
+    } = game;
 
-    const [questionIndex, setQuestionIndex] = useState(0)
-    const [timeLeft, setTimeLeft] = useState(QUESTION_TIME_SECONDS)
-    const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null)
-    const [isResolvingAnswer, setIsResolvingAnswer] = useState(false)
-    const [correctAnswersCount, setCorrectAnswersCount] = useState(0)
-    const [accumulatedSeconds, setAccumulatedSeconds] = useState(0)
-    const [displayOptions, setDisplayOptions] = useState<string[]>([])
-    const [usedPowerUps, setUsedPowerUps] = useState({ fiftyFifty: false, skipQuestion: false })
-    const isFinishingRound = useRef(false)
-    const intervalRef = useRef<number | null>(null)
-    const hasLoadedLevelRef = useRef(false)
-    const resolveAnswerRef = useRef<(answer: string | null) => void>(() => undefined)
+    const [questionIndex, setQuestionIndex] = useState(0);
+    const [timeLeft, setTimeLeft] = useState(QUESTION_TIME_SECONDS);
+    const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
+    const [isResolvingAnswer, setIsResolvingAnswer] = useState(false);
 
-    const currentQuestion = questions[questionIndex]
-    const currentOptions = useMemo(
-        () => (currentQuestion ? shuffleOptions(currentQuestion) : []),
-        [currentQuestion],
-    )
+    const [usedPowerUps, setUsedPowerUps] = useState({
+        fiftyFifty: false,
+        skipQuestion: false
+    });
 
+    const [displayOptions, setDisplayOptions] = useState<string[]>([]);
+
+    // =========================
+    // INICIAR NIVEL CON 3 VIDAS
+    // =========================
     useEffect(() => {
-        setDisplayOptions(currentOptions)
-        setUsedPowerUps({ fiftyFifty: false, skipQuestion: false })
-        setPowerUpFeedback(null)
-    }, [currentOptions, setPowerUpFeedback])
+        startLevel(levelId);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [levelId]);
 
+    // =========================
+    // CARGAR PREGUNTAS
+    // =========================
     useEffect(() => {
-        if (hasLoadedLevelRef.current) {
-            return
-        }
+        getQuestionsForLevel(levelId);
+    }, [levelId, getQuestionsForLevel]);
 
-        hasLoadedLevelRef.current = true
-        startLevel(level.id)
-        setQuestionIndex(0)
-        setTimeLeft(QUESTION_TIME_SECONDS)
-        setSelectedAnswer(null)
-        setIsResolvingAnswer(false)
-        setCorrectAnswersCount(0)
-        setAccumulatedSeconds(0)
-        isFinishingRound.current = false
+    const currentQuestion = questions[questionIndex];
 
-        void getQuestionsForLevel(level.id)
-    }, [getQuestionsForLevel, level.id, startLevel])
-
+    // =========================
+    // MEZCLAR OPCIONES
+    // =========================
     useEffect(() => {
-        if (!currentQuestion || isResolvingAnswer || isFinishingRound.current) {
-            return
-        }
+        if (!currentQuestion) return;
 
-        if (intervalRef.current) {
-            window.clearInterval(intervalRef.current)
-        }
+        const allOptions = [
+            currentQuestion.correctAnswer,
+            ...currentQuestion.incorrectAnswers
+        ];
 
-        intervalRef.current = window.setInterval(() => {
-            setTimeLeft((previous) => {
-                if (previous <= 1) {
-                    if (intervalRef.current) {
-                        window.clearInterval(intervalRef.current)
-                        intervalRef.current = null
-                    }
+        setDisplayOptions(
+            [...allOptions].sort(() => Math.random() - 0.5)
+        );
+    }, [currentQuestion]);
 
-                    queueMicrotask(() => {
-                        resolveAnswerRef.current(null)
-                    })
+    // =========================
+    // TIMER
+    // =========================
+    useEffect(() => {
+        if (isResolvingAnswer || !currentQuestion) return;
 
-                    return 0
+        const timer = setInterval(() => {
+            setTimeLeft((prev) => {
+                if (prev <= 1) {
+                    clearInterval(timer);
+                    return 0;
                 }
 
-                return previous - 1
-            })
-        }, 1000)
+                return prev - 1;
+            });
+        }, 1000);
 
-        return () => {
-            if (intervalRef.current) {
-                window.clearInterval(intervalRef.current)
-                intervalRef.current = null
-            }
-        }
-    }, [currentQuestion, isResolvingAnswer])
+        return () => clearInterval(timer);
+    }, [isResolvingAnswer, currentQuestion]);
 
-    const syncResultToFirestore = useCallback(async (finalScore: number, livesLeft: number) => {
-        if (!isFirebaseConfigured || !db || !user) {
-            return
-        }
-
-        await setDoc(
-            doc(db, 'users', user.uid),
-            {
-                uid: user.uid,
-                displayName: user.displayName,
-                bestScore: Math.max(user.bestScore, finalScore),
-                lastScore: finalScore,
-                lastLevel: level.id,
-                lastLives: livesLeft,
-                updatedAt: serverTimestamp(),
-            },
-            { merge: true },
-        )
-    }, [level.id, user])
-
-    const finishRound = useCallback(async (nextCorrectAnswers: number, totalSecondsRemaining: number, livesLeft: number) => {
-        if (isFinishingRound.current) {
-            return
-        }
-
-        isFinishingRound.current = true
-        const finalScore = calculateScore({
-            correctAnswers: nextCorrectAnswers,
-            lives: livesLeft,
-            secondsRemaining: totalSecondsRemaining,
-        })
-
-        setCorrectAnswers(nextCorrectAnswers)
-        setSecondsRemaining(totalSecondsRemaining)
-        setRoundScore(finalScore)
-        updateBestScore(finalScore)
-
-        try {
-            await syncResultToFirestore(finalScore, livesLeft)
-        } catch {
-            // Mantener la experiencia local aunque Firestore no esté disponible.
-        }
-
-        navigate(`/level-complete/${level.id}`)
-    }, [level.id, navigate, setCorrectAnswers, setRoundScore, setSecondsRemaining, syncResultToFirestore, updateBestScore])
-
-    const moveToNextQuestion = useCallback(async (nextCorrectAnswers: number, nextSecondsRemaining: number, livesLeft: number) => {
-        const isGameOver = livesLeft <= 0
-        const isLastQuestion = questionIndex >= questions.length - 1
-
-        if (isGameOver || isLastQuestion) {
-            await finishRound(nextCorrectAnswers, nextSecondsRemaining, livesLeft)
-            return
-        }
-
-        setQuestionIndex((previous) => previous + 1)
-        setTimeLeft(QUESTION_TIME_SECONDS)
-        setSelectedAnswer(null)
-        setIsResolvingAnswer(false)
-    }, [finishRound, questionIndex, questions.length])
-
-    const resolveAnswer = useCallback(async (answer: string | null) => {
-        if (!currentQuestion || isResolvingAnswer || isFinishingRound.current) {
-            return
-        }
-
-        setIsResolvingAnswer(true)
-
-        const isCorrect = answer === currentQuestion.correctAnswer
-        const safeAnswer = answer ?? 'timeout'
-        const secondsGain = isCorrect ? timeLeft : 0
-        const nextCorrectAnswers = isCorrect ? correctAnswersCount + 1 : correctAnswersCount
-        const nextSecondsRemaining = accumulatedSeconds + secondsGain
-        const nextLives = isCorrect ? progress.lives : Math.max(0, progress.lives - 1)
-
-        setSelectedAnswer(safeAnswer)
-        setCorrectAnswersCount(nextCorrectAnswers)
-        setAccumulatedSeconds(nextSecondsRemaining)
-
-        if (isCorrect) {
-            registerCorrectAnswer()
-            playEffect('correct')
-        } else {
-            registerIncorrectAnswer()
-            playEffect('incorrect')
-        }
-
-        window.setTimeout(() => {
-            void moveToNextQuestion(nextCorrectAnswers, nextSecondsRemaining, nextLives)
-        }, 450)
-    }, [accumulatedSeconds, correctAnswersCount, currentQuestion, isResolvingAnswer, moveToNextQuestion, playEffect, progress.lives, registerCorrectAnswer, registerIncorrectAnswer, timeLeft])
-
+    // =========================
+    // TIMEOUT
+    // =========================
     useEffect(() => {
-        resolveAnswerRef.current = resolveAnswer
-    }, [resolveAnswer])
-
-    useEffect(() => () => {
-        if (intervalRef.current) {
-            window.clearInterval(intervalRef.current)
-            intervalRef.current = null
+        if (timeLeft === 0 && !isResolvingAnswer) {
+            handleResolveAnswer(null);
         }
-    }, [])
+    }, [timeLeft, isResolvingAnswer]);
 
-    const handleUseFiftyFifty = useCallback(async () => {
-        if (!currentQuestion || isResolvingAnswer) {
-            return
-        }
+    // =========================
+    // RESOLVER RESPUESTA
+    // =========================
+    const handleResolveAnswer = useCallback(
+        async (answer: string | null) => {
+            if (!currentQuestion || isResolvingAnswer) return;
 
-        const result = await activateFiftyFifty({
-            options: displayOptions,
-            correctAnswer: currentQuestion.correctAnswer,
-            alreadyUsed: usedPowerUps.fiftyFifty,
-        })
+            setIsResolvingAnswer(true);
 
-        if (!result.success) {
-            return
-        }
+            const isCorrect =
+                answer === currentQuestion.correctAnswer;
 
-        setDisplayOptions(result.options)
-        playEffect('powerup')
-        setUsedPowerUps((previous) => ({ ...previous, fiftyFifty: true }))
-    }, [activateFiftyFifty, currentQuestion, displayOptions, isResolvingAnswer, playEffect, usedPowerUps.fiftyFifty])
+            // Timeout o incorrecta = -1 vida
+            const penalty = isCorrect ? 0 : 1;
 
-    const handleUseSkipQuestion = useCallback(async () => {
-        if (!currentQuestion || isResolvingAnswer || isFinishingRound.current) {
-            return
-        }
+            setSelectedAnswer(answer ?? 'timeout');
 
-        const used = await activateSkipQuestion({ alreadyUsed: usedPowerUps.skipQuestion })
+            if (isCorrect) {
+                registerCorrectAnswer();
+                playEffect('correct');
+            } else {
+                registerIncorrectAnswer();
+                playEffect('incorrect');
+            }
 
-        if (!used) {
-            return
-        }
+            setTimeout(() => {
+                const remainingLives = progress.lives - penalty;
 
-        if (intervalRef.current) {
-            window.clearInterval(intervalRef.current)
-            intervalRef.current = null
-        }
+                // =========================
+                // SIN VIDAS = DERROTA
+                // =========================
+                if (remainingLives <= 0) {
+                    navigate(`/level-complete/${levelId}`, {
+                        replace: true
+                    });
 
-        playEffect('powerup')
-        setUsedPowerUps((previous) => ({ ...previous, skipQuestion: true }))
-        setIsResolvingAnswer(true)
-        void moveToNextQuestion(correctAnswersCount, accumulatedSeconds, progress.lives)
-    }, [accumulatedSeconds, activateSkipQuestion, correctAnswersCount, currentQuestion, isResolvingAnswer, moveToNextQuestion, playEffect, progress.lives, usedPowerUps.skipQuestion])
+                    return;
+                }
+
+                // =========================
+                // ÚLTIMA PREGUNTA
+                // =========================
+                if (questionIndex >= questions.length - 1) {
+                    navigate(`/level-complete/${levelId}`, {
+                        replace: true
+                    });
+
+                    return;
+                }
+
+                // =========================
+                // SIGUIENTE PREGUNTA
+                // =========================
+                setQuestionIndex((prev) => prev + 1);
+                setTimeLeft(QUESTION_TIME_SECONDS);
+                setSelectedAnswer(null);
+                setIsResolvingAnswer(false);
+
+                setUsedPowerUps({
+                    fiftyFifty: false,
+                    skipQuestion: false
+                });
+            }, 1500);
+        },
+        [
+            currentQuestion,
+            isResolvingAnswer,
+            progress.lives,
+            questionIndex,
+            questions.length,
+            navigate,
+            registerCorrectAnswer,
+            registerIncorrectAnswer,
+            playEffect,
+            levelId
+        ]
+    );
+
+    // =========================
+    // LOADING
+    // =========================
+    if (isLoading) {
+        return (
+            <div className="min-h-screen bg-[#0B0E14] flex flex-col items-center justify-center text-white">
+                <div className="w-12 h-12 border-4 border-[#8E76FF] border-t-transparent rounded-full animate-spin mb-4"></div>
+
+                <p className="font-bold">
+                    Cargando retos...
+                </p>
+            </div>
+        );
+    }
+
+    if (!currentQuestion) return null;
 
     return (
-        <MobileLayout title="Pantalla de juego" subtitle={`Nivel ${level.label}`}>
-            <div className="space-y-4">
-                <CoinDisplay className="w-fit" coins={coins} />
-
-                <ScreenCard title="Estado de la ronda" description="15 segundos por pregunta. Si el tiempo llega a cero, cuenta como incorrecta y avanza automáticamente.">
-                    <div className="grid grid-cols-3 gap-2 text-center text-sm">
-                        <div className="rounded-2xl bg-black/5 px-3 py-3 dark:bg-white/5">
-                            <p className="text-master-muted">Pregunta</p>
-                            <p className="font-bold text-master-primary">{Math.min(questionIndex + 1, level.amount)}/{level.amount}</p>
-                        </div>
-                        <div className="rounded-2xl bg-black/5 px-3 py-3 dark:bg-white/5">
-                            <p className="text-master-muted">Vidas</p>
-                            <p className="font-bold text-master-primary">{progress.lives}</p>
-                        </div>
-                        <div className="rounded-2xl bg-black/5 px-3 py-3 dark:bg-white/5">
-                            <p className="text-master-muted">Tiempo</p>
-                            <p className="font-bold text-master-primary">{timeLeft}s</p>
-                        </div>
-                    </div>
-                </ScreenCard>
-
-                {isLoading ? (
-                    <ScreenCard title="Cargando preguntas" description="Obteniendo trivia real desde Open Trivia DB..." />
-                ) : null}
-
-                {!isLoading && error ? (
-                    <ScreenCard title="Conexión inestable" description="No se pudo cargar la API. Se usarán preguntas cacheadas o mocks automáticamente." />
-                ) : null}
-
-                {!isLoading && currentQuestion ? (
-                    <AnimatePresence mode="wait">
-                        <motion.div
-                            animate={{ opacity: 1, y: 0 }}
-                            initial={{ opacity: 0, y: 14 }}
-                            key={questionIndex}
-                            transition={{ duration: 0.28 }}
+        <div className="flex flex-col min-h-screen bg-[#0B0E14] text-white p-4 font-sans">
+            {/* TOP BAR */}
+            <div className="flex items-center justify-between mb-4">
+                <div className="flex gap-1">
+                    {[...Array(3)].map((_, i) => (
+                        <span
+                            key={i}
+                            className={`text-2xl ${i < progress.lives
+                                ? ''
+                                : 'opacity-20 grayscale'
+                                }`}
                         >
-                            <ScreenCard title={currentQuestion.category} description={currentQuestion.question}>
-                                <div className="space-y-4">
-                                    <div className="grid grid-cols-2 gap-2">
-                                        <PowerUpButton
-                                            cost={POWER_UP_COSTS.fiftyFifty}
-                                            disabled={isResolvingAnswer || !canUseFiftyFifty}
-                                            label="50/50"
-                                            onClick={() => {
-                                                void handleUseFiftyFifty()
-                                            }}
-                                        />
-                                        <PowerUpButton
-                                            cost={POWER_UP_COSTS.skipQuestion}
-                                            disabled={isResolvingAnswer || !canUseSkipQuestion}
-                                            label="Skip"
-                                            onClick={() => {
-                                                void handleUseSkipQuestion()
-                                            }}
-                                        />
-                                    </div>
+                            ❤️
+                        </span>
+                    ))}
+                </div>
 
-                                    {powerUpFeedback ? (
-                                        <motion.p
-                                            animate={{ opacity: 1, y: 0 }}
-                                            className={[
-                                                'rounded-xl px-3 py-2 text-sm font-semibold',
-                                                powerUpFeedback.type === 'success'
-                                                    ? 'bg-emerald-100/80 text-emerald-900'
-                                                    : powerUpFeedback.type === 'error'
-                                                        ? 'bg-rose-100/80 text-rose-900'
-                                                        : 'bg-sky-100/80 text-sky-900',
-                                            ].join(' ')}
-                                            initial={{ opacity: 0, y: -6 }}
-                                        >
-                                            {powerUpFeedback.message}
-                                        </motion.p>
-                                    ) : null}
+                <div className="text-center">
+                    <p className="text-[10px] text-gray-500 uppercase font-black tracking-widest">
+                        Nivel
+                    </p>
 
-                                    {displayOptions.map((option) => {
-                                        const isSelected = selectedAnswer === option
-                                        const isCorrectOption = option === currentQuestion.correctAnswer
-                                        const showCorrectState = isResolvingAnswer && isCorrectOption
-                                        const showIncorrectState = isResolvingAnswer && isSelected && !isCorrectOption
+                    <p className="text-sm font-black text-[#8E76FF]">
+                        {level.label}
+                    </p>
+                </div>
 
-                                        return (
-                                            <button
-                                                key={option}
-                                                className={[
-                                                    'w-full rounded-2xl border px-4 py-4 text-left font-semibold transition',
-                                                    showCorrectState
-                                                        ? 'neon-glow border-emerald-400 bg-emerald-100/70 text-emerald-900'
-                                                        : showIncorrectState
-                                                            ? 'border-rose-400 bg-rose-100/70 text-rose-900'
-                                                            : 'border-master-border bg-master-surface hover:scale-[1.01]',
-                                                ].join(' ')}
-                                                disabled={isResolvingAnswer}
-                                                onClick={() => {
-                                                    void resolveAnswer(option)
-                                                }}
-                                                type="button"
-                                            >
-                                                {option}
-                                            </button>
-                                        )
-                                    })}
-                                </div>
-                            </ScreenCard>
-                        </motion.div>
-                    </AnimatePresence>
-                ) : null}
+                <div className="bg-[#1A1D24] px-4 py-1 rounded-full border border-gray-800 flex items-center gap-2">
+                    <span className="text-yellow-500">🪙</span>
 
-                {!isLoading && !currentQuestion ? (
-                    <ScreenCard title="Sin preguntas" description="No hay preguntas disponibles en este momento. Puedes volver y reintentar." />
-                ) : null}
-
-                <div className="grid grid-cols-2 gap-3">
-                    <Link className="rounded-2xl border border-master-border bg-master-surface-strong px-4 py-4 text-center font-semibold text-master-primary" to="/levels">
-                        Salir
-                    </Link>
-                    <Link className="rounded-2xl bg-master-primary px-4 py-4 text-center font-semibold text-white" to="/ranking">
-                        Ver Ranking
-                    </Link>
+                    <span className="text-sm font-bold">
+                        {coins}
+                    </span>
                 </div>
             </div>
-        </MobileLayout>
-    )
+
+            {/* TIMER */}
+            <div className="w-full h-2 bg-gray-800 rounded-full mb-8 overflow-hidden">
+                <motion.div
+                    className="h-full bg-[#8E76FF]"
+                    initial={{ width: '100%' }}
+                    animate={{
+                        width: `${(timeLeft / QUESTION_TIME_SECONDS) *
+                            100
+                            }%`
+                    }}
+                    transition={{
+                        duration: 1,
+                        ease: 'linear'
+                    }}
+                />
+            </div>
+
+            {/* PREGUNTA */}
+            <div className="bg-[#0D1117] rounded-[2.5rem] p-10 border border-gray-800 text-center mb-10 relative flex items-center justify-center shadow-xl">
+                <button
+                    onClick={() => navigate('/levels')}
+                    className="absolute -top-2 -left-2 bg-[#1A1D24] p-2.5 rounded-full border border-gray-700 text-xs"
+                >
+                    ✕
+                </button>
+
+                <h2 className="text-xl font-bold leading-tight">
+                    {currentQuestion.question}
+                </h2>
+            </div>
+
+            {/* OPCIONES */}
+            <div className="flex-1 space-y-4 mb-32">
+                {displayOptions.map((option) => {
+                    const isSelected =
+                        selectedAnswer === option;
+
+                    const isCorrect =
+                        option === currentQuestion.correctAnswer;
+
+                    let btnStyle =
+                        'bg-white text-[#0B0E14]';
+
+                    if (isResolvingAnswer) {
+                        if (isCorrect) {
+                            btnStyle =
+                                'bg-green-500 text-white';
+                        } else if (isSelected) {
+                            btnStyle =
+                                'bg-red-500 text-white';
+                        } else if (
+                            selectedAnswer === 'timeout' &&
+                            isCorrect
+                        ) {
+                            btnStyle =
+                                'bg-green-500/50 text-white';
+                        }
+                    }
+
+                    return (
+                        <button
+                            key={option}
+                            disabled={isResolvingAnswer}
+                            onClick={() =>
+                                handleResolveAnswer(option)
+                            }
+                            className={`w-full p-5 rounded-2xl font-black text-left transition-all active:scale-95 shadow-sm ${btnStyle}`}
+                        >
+                            {option}
+                        </button>
+                    );
+                })}
+            </div>
+
+            {/* POWER UPS */}
+            <div className="fixed bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-[#0B0E14] to-transparent flex gap-4">
+                {/* 50/50 */}
+                <button
+                    onClick={async () => {
+                        const res =
+                            await activateFiftyFifty({
+                                options: displayOptions,
+                                correctAnswer:
+                                    currentQuestion.correctAnswer,
+                                alreadyUsed:
+                                    usedPowerUps.fiftyFifty
+                            });
+
+                        if (
+                            res &&
+                            typeof res === 'object' &&
+                            'options' in res
+                        ) {
+                            setDisplayOptions(res.options);
+
+                            setUsedPowerUps((prev) => ({
+                                ...prev,
+                                fiftyFifty: true
+                            }));
+                        }
+                    }}
+                    disabled={
+                        isResolvingAnswer ||
+                        coins < 40 ||
+                        usedPowerUps.fiftyFifty
+                    }
+                    className="flex-1 bg-[#1A1D24] p-4 rounded-2xl border border-gray-700 flex items-center justify-center gap-3 disabled:opacity-30"
+                >
+                    <span className="text-[#8E76FF] font-black text-xl">
+                        ½
+                    </span>
+
+                    <div className="text-left">
+                        <p className="text-[10px] font-black text-gray-500 uppercase leading-none mb-1 tracking-tighter">
+                            50/50
+                        </p>
+
+                        <p className="text-xs font-black text-white leading-none">
+                            🪙 40
+                        </p>
+                    </div>
+                </button>
+
+                {/* SKIP */}
+                <button
+                    onClick={async () => {
+                        const success =
+                            await activateSkipQuestion({
+                                alreadyUsed:
+                                    usedPowerUps.skipQuestion
+                            });
+
+                        if (success) {
+                            setUsedPowerUps((prev) => ({
+                                ...prev,
+                                skipQuestion: true
+                            }));
+
+                            handleResolveAnswer(
+                                currentQuestion.correctAnswer
+                            );
+                        }
+                    }}
+                    disabled={
+                        isResolvingAnswer ||
+                        coins < 60 ||
+                        usedPowerUps.skipQuestion
+                    }
+                    className="flex-1 bg-[#1A1D24] p-4 rounded-2xl border border-gray-700 flex items-center justify-center gap-3 disabled:opacity-30"
+                >
+                    <span className="text-emerald-500 font-black text-xl">
+                        ≫
+                    </span>
+
+                    <div className="text-left">
+                        <p className="text-[10px] font-black text-gray-500 uppercase leading-none mb-1 tracking-tighter">
+                            Saltar
+                        </p>
+
+                        <p className="text-xs font-black text-white leading-none">
+                            🪙 60
+                        </p>
+                    </div>
+                </button>
+            </div>
+        </div>
+    );
 }

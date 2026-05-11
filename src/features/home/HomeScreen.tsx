@@ -1,69 +1,106 @@
-import { useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { MobileLayout } from '../../components/layout/MobileLayout'
-import { CoinDisplay } from '../../components/ui/CoinDisplay'
-import { ScreenCard } from '../../components/ui/ScreenCard'
 import { useGameStore } from '../../store/gameStore'
-import { useAuth } from '../../hooks/useAuth'
 
 export function HomeScreen() {
+    // Extraemos los datos base del store
     const userName = useGameStore((state) => state.userName)
     const coins = useGameStore((state) => state.coins)
-    const { signIn, loading } = useAuth()
-    const [draftName, setDraftName] = useState(userName)
 
-    async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-        event.preventDefault()
-        await signIn(draftName)
-    }
+    // Extraemos datos anidados según la estructura de tu gameStore.ts
+    const bestScore = useGameStore((state) => state.user?.bestScore) || 0
+    const currentLevelId = useGameStore((state) => state.progress.currentLevel) || 'Novato'
+
+    // Dato estático para la racha (puedes implementarlo luego en el store si quieres)
+    const dailyStreak = 5
 
     return (
-        <MobileLayout title="Inicio" subtitle="Pantalla principal de MindMaster">
-            <div className="space-y-4">
-                <CoinDisplay className="w-fit" coins={coins} />
+        <MobileLayout title="Inicio" showHeader={false} showNavigation={true}>
+            <div className="flex flex-col gap-6 pb-24">
 
-                <ScreenCard title={`Hola, ${userName || 'Usuario'}`} description="Ingresa tu nombre para crear tu sesión anónima y comenzar con 100 monedas de regalo.">
-                    <form className="space-y-4" onSubmit={handleSubmit}>
-                        <div className="rounded-2xl border border-master-border bg-master-surface px-4 py-3 shadow-sm">
-                            <label className="text-sm font-semibold text-master-muted" htmlFor="username">
-                                Nombre de usuario
-                            </label>
-                            <input
-                                className="mt-2 w-full bg-transparent text-lg font-semibold text-master-text outline-none placeholder:text-master-muted"
-                                id="username"
-                                maxLength={20}
-                                onChange={(event) => setDraftName(event.target.value)}
-                                placeholder="Ingresa tu apodo..."
-                                value={draftName}
-                            />
+                {/* HEADER: Usuario, Monedas y Nombre App */}
+                <div className="flex items-center justify-between pt-4 px-2">
+                    <div className="flex items-center gap-3">
+                        <div className="h-12 w-12 rounded-full border-2 border-master-primary bg-master-surface overflow-hidden shadow-sm flex items-center justify-center text-2xl">
+                            {/* Puedes usar un emoji o un placeholder mientras configuras las fotos de perfil */}
+                            👤
                         </div>
-                        <button className="w-full rounded-2xl bg-master-primary px-4 py-4 font-semibold text-white disabled:opacity-70" disabled={loading} type="submit">
-                            {loading ? 'Conectando...' : 'Entrar con nombre'}
-                        </button>
-                    </form>
-                </ScreenCard>
-
-                <ScreenCard title="Estado rápido" description="La persistencia local y el ranking quedarán sincronizados más adelante con Firestore.">
-                    <div className="grid grid-cols-2 gap-3">
-                        <div className="rounded-2xl bg-black/5 p-4 dark:bg-white/5">
-                            <p className="text-sm text-master-muted">Monedas</p>
-                            <p className="mt-1 text-2xl font-bold text-master-primary">{coins}</p>
-                        </div>
-                        <div className="rounded-2xl bg-black/5 p-4 dark:bg-white/5">
-                            <p className="text-sm text-master-muted">Modo</p>
-                            <p className="mt-1 text-2xl font-bold text-master-primary">Mobile</p>
+                        <div className="flex flex-col">
+                            <span className="text-[10px] font-black text-master-muted uppercase tracking-tighter leading-none">Usuario</span>
+                            <span className="text-sm font-bold text-master-text truncate max-w-[80px]">{userName || 'Invitado'}</span>
+                            <div className="flex items-center gap-1 text-master-primary font-black text-xs">
+                                <span>$</span>
+                                <span>{coins.toLocaleString()}</span>
+                            </div>
                         </div>
                     </div>
-                </ScreenCard>
+                    <h1 className="text-2xl font-black text-master-primary italic tracking-tighter">MindMaster</h1>
+                </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                    <Link className="rounded-2xl bg-master-primary px-4 py-4 text-center font-semibold text-white" to="/levels">
-                        Jugar
-                    </Link>
-                    <Link className="rounded-2xl border border-master-border bg-master-surface-strong px-4 py-4 text-center font-semibold text-master-primary" to="/ranking">
-                        Ranking
+                {/* CARD PRINCIPAL: Invitación al juego */}
+                <div className="relative overflow-hidden rounded-[2.5rem] bg-master-surface p-8 shadow-app border border-master-border flex flex-col items-center text-center gap-6">
+                    <div className="relative">
+                        <div className="h-24 w-24 bg-master-primary/10 rounded-full flex items-center justify-center border border-master-primary/20">
+                            <span className="text-5xl">🧠</span>
+                        </div>
+                        <span className="absolute -top-1 -right-1 bg-master-accent text-[10px] font-black px-2 py-1 rounded-lg text-white shadow-neon animate-bounce">NUEVO</span>
+                    </div>
+
+                    <div className="space-y-1">
+                        <h2 className="text-3xl font-extrabold text-master-text tracking-tight">¿Listo para el desafío?</h2>
+                        <p className="text-master-muted font-medium text-sm">Pon a prueba tus conocimientos hoy</p>
+                    </div>
+
+                    <Link
+                        to="/levels"
+                        className="w-full rounded-2xl bg-master-primary py-4 text-xl font-bold text-white shadow-neon hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-3"
+                    >
+                        <span className="text-base">▶</span>
+                        <span>¡Jugar!</span>
                     </Link>
                 </div>
+
+                {/* GRID: Ranking y Créditos */}
+                <div className="grid grid-cols-2 gap-4">
+                    <Link to="/ranking" className="flex flex-col items-center justify-center gap-3 p-6 rounded-[2rem] bg-master-surface border border-master-border shadow-sm hover:shadow-md transition-all active:scale-95">
+                        <div className="h-12 w-12 rounded-2xl bg-master-accent/10 flex items-center justify-center text-master-accent text-2xl shadow-inner">
+                            📊
+                        </div>
+                        <span className="font-bold text-master-text text-center text-sm leading-tight">Ranking<br />Mundial</span>
+                    </Link>
+                    <Link to="/credits" className="flex flex-col items-center justify-center gap-3 p-6 rounded-[2rem] bg-master-surface border border-master-border shadow-sm hover:shadow-md transition-all active:scale-95">
+                        <div className="h-12 w-12 rounded-2xl bg-master-primary/10 flex items-center justify-center text-master-primary text-2xl shadow-inner">
+                            👥
+                        </div>
+                        <span className="font-bold text-master-text text-sm">Créditos</span>
+                    </Link>
+                </div>
+
+                {/* SECCIÓN: Tu Progreso */}
+                <div className="mt-2 space-y-4">
+                    <div className="flex items-center justify-between px-2">
+                        <h3 className="text-xl font-bold text-master-text tracking-tight">Tu Progreso</h3>
+                        <Link to="/profile" className="text-[10px] font-black text-master-primary uppercase tracking-widest bg-master-primary/10 px-2 py-1 rounded-md">Ver todo</Link>
+                    </div>
+
+                    <div className="space-y-3">
+                        <div className="flex items-center justify-between p-4 rounded-2xl bg-master-surface-strong border border-master-border shadow-sm">
+                            <div className="flex items-center gap-3">
+                                <span className="text-lg">📈</span>
+                                <span className="font-bold text-sm text-master-text">Mejor Puntaje</span>
+                            </div>
+                            <span className="font-black text-master-primary">{bestScore} pts</span>
+                        </div>
+                        <div className="flex items-center justify-between p-4 rounded-2xl bg-master-surface-strong border border-master-border shadow-sm">
+                            <div className="flex items-center gap-3">
+                                <span className="text-lg">🏆</span>
+                                <span className="font-bold text-sm text-master-text">Nivel Actual</span>
+                            </div>
+                            <span className="font-black text-master-primary">{currentLevelId}</span>
+                        </div>
+                    </div>
+                </div>
+
             </div>
         </MobileLayout>
     )
