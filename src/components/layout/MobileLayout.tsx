@@ -26,9 +26,6 @@ export function MobileLayout({ title, subtitle, showNavigation = true, showHeade
                             <h1 className="text-2xl font-bold text-master-primary">{title}</h1>
                             {subtitle ? <p className="mt-1 text-sm text-master-muted">{subtitle}</p> : null}
                         </div>
-                        <Link className="rounded-full border border-master-border bg-master-surface-strong px-4 py-2 text-sm font-semibold text-master-primary" to="/home">
-                            Inicio
-                        </Link>
                     </header>
                 ) : null}
 
