@@ -25,6 +25,7 @@ export type UserProfile = {
     photoURL?: string
     coins: number
     bestScore: number
+    completedLevels: string[];
 }
 
 export type GameProgress = {

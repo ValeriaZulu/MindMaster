@@ -21,6 +21,7 @@ function createAnonymousProfile(displayName: string): UserProfile {
         displayName,
         coins: 100,
         bestScore: 0,
+        completedLevels: []
     }
 }
 
@@ -37,9 +38,12 @@ export function useAuth() {
     const [loading, setLoading] = useState(false)
 
     useEffect(() => {
-        saveToStorage(AUTH_STORAGE_KEY, state.user)
-        saveToStorage(AUTH_NAME_KEY, state.user?.displayName ?? '')
-        setUser(state.user)
+
+        if (state.user) {
+            saveToStorage(AUTH_STORAGE_KEY, state.user)
+            saveToStorage(AUTH_NAME_KEY, state.user?.displayName ?? '')
+            setUser(state.user)
+        }
     }, [setUser, state.user])
 
     async function signIn(displayName: string) {
@@ -78,6 +82,7 @@ export function useAuth() {
                     displayName: trimmedName,
                     coins: state.user?.coins ?? 100,
                     bestScore: state.user?.bestScore ?? 0,
+                    completedLevels: state.user?.completedLevels ?? []
                 }
 
                 setState({ user: nextUser, isAuthenticated: true })

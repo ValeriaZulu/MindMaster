@@ -20,7 +20,6 @@ type GameStoreState = {
     coins: number
     progress: GameProgress
     settings: SettingsState
-    setUserName: (userName: string) => void
     setUser: (user: UserProfile | null) => void
     setTheme: (theme: ThemeMode) => void
     toggleSound: () => void
@@ -28,7 +27,7 @@ type GameStoreState = {
     addCoins: (amount: number) => void
     spendCoins: (amount: number) => boolean
     startLevel: (levelId: LevelId) => void
-    completeLevel: (levelId: LevelId, score: number) => Promise<void> // Nueva función
+    completeLevel: (levelId: LevelId, score: number) => Promise<void>
     answerCorrect: () => void
     answerIncorrect: () => void
     setSecondsRemaining: (secondsRemaining: number) => void
@@ -38,13 +37,13 @@ type GameStoreState = {
     resetProgress: () => void
 }
 
-const initialUser = loadFromStorage<UserProfile | null>(USER_STORAGE_KEY, null)
+const initialUser = loadFromStorage<UserProfile | null>(USER_STORAGE_KEY, null);
 const initialProgress = loadFromStorage<GameProgress>(PROGRESS_STORAGE_KEY, {
     lives: 3,
     score: 0,
     correctAnswers: 0,
     secondsRemaining: 0,
-    currentLevel: 'novato', // Iniciamos en novato por defecto
+    currentLevel: 'novato',
 })
 const initialSettings = loadFromStorage<SettingsState>(SETTINGS_STORAGE_KEY, {
     theme: 'light',
@@ -59,16 +58,19 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     progress: initialProgress,
     settings: initialSettings,
 
-    setUserName: (userName) => {
-        const currentUser = get().user
-        const nextUser = currentUser ? { ...currentUser, displayName: userName } : null
-        set({ userName, user: nextUser })
-        saveToStorage(USER_STORAGE_KEY, nextUser)
-    },
-
     setUser: (user) => {
-        set({ user, userName: user?.displayName ?? '', coins: user?.coins ?? 100 })
-        saveToStorage(USER_STORAGE_KEY, user)
+
+        if (user === null) {
+            set({ user: null, userName: '', coins: 100 });
+            return;
+        }
+
+        set({
+            user: user,
+            userName: user?.displayName ?? '',
+            coins: user?.coins ?? 100
+        });
+        saveToStorage(USER_STORAGE_KEY, user);
     },
 
     setTheme: (theme) => {
@@ -126,33 +128,19 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
         saveToStorage(PROGRESS_STORAGE_KEY, nextProgress)
     },
 
-    // IMPLEMENTACIÓN COMPLETA DE PROGRESIÓN
     completeLevel: async (levelId, score) => {
-        const { user, progress, coins } = get();
-
-        // 1. Lógica de progresión (esto debe ejecutarse SIEMPRE)
+        const { user, progress } = get();
         const levelOrder: LevelId[] = ['novato', 'aprendiz', 'experto'];
         const currentIndex = levelOrder.indexOf(levelId);
-
-        // Calculamos el siguiente nivel
         const nextLevelId = levelOrder[currentIndex + 1] || levelId;
 
-        // Actualizamos el progreso local
-        const nextProgress = {
-            ...progress,
-            currentLevel: nextLevelId
-        };
-
-        // Actualizamos el estado y el storage local de una vez
+        const nextProgress = { ...progress, currentLevel: nextLevelId };
         set({ progress: nextProgress });
         saveToStorage(PROGRESS_STORAGE_KEY, nextProgress);
 
-        // 2. Lógica de Usuario y Firebase (Solo si existe el usuario)
         if (user && user.uid) {
             const nextBestScore = Math.max(user.bestScore, score);
-            // Aquí no sumamos monedas porque ya las sumas en la pantalla de LevelComplete
             const nextUser = { ...user, bestScore: nextBestScore };
-
             set({ user: nextUser });
             saveToStorage(USER_STORAGE_KEY, nextUser);
 
@@ -168,6 +156,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
             }
         }
     },
+
     answerCorrect: () => {
         const currentProgress = get().progress
         const nextProgress: GameProgress = {
