@@ -32,7 +32,7 @@ export function SplashScreen() {
 
             // Si es único, guardamos y avanzamos
             setUserName(nick.trim());
-            navigate('/levels');
+            navigate('/home');
         } catch (err) {
             setError('Error de conexión. Intenta de nuevo.');
             setLoading(false);

@@ -3,6 +3,7 @@ import { CreditsScreen } from '../features/credits/CreditsScreen'
 import { GameScreen } from '../features/game/GameScreen'
 import { HomeScreen } from '../features/home/HomeScreen'
 import { LevelCompleteScreen } from '../features/level-complete/LevelCompleteScreen'
+import { LevelFailedScreen } from '../features/level-failed/LevelFailedScreen'
 import { LevelsScreen } from '../features/levels/LevelsScreen'
 import { RankingScreen } from '../features/ranking/RankingScreen'
 import { SettingsScreen } from '../features/settings/SettingsScreen'
@@ -19,6 +20,7 @@ export function AppRouter() {
                 <Route path="/levels" element={<LevelsScreen />} />
                 <Route path="/game/:levelId" element={<GameScreen />} />
                 <Route path="/level-complete/:levelId" element={<LevelCompleteScreen />} />
+                <Route path="/level-failed/:levelId" element={<LevelFailedScreen />} />
                 <Route path="/ranking" element={<RankingScreen />} />
                 <Route path="/social" element={<SocialScreen />} />
                 <Route path="/settings" element={<SettingsScreen />} />

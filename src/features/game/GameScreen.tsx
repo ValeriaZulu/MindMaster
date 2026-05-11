@@ -6,6 +6,7 @@ import { usePowerUp } from '../../hooks/usePowerUp';
 import { useSound } from '../../hooks/useSound';
 import { TRIVIA_LEVELS, useTrivia } from '../../hooks/useTrivia';
 import type { LevelId } from '../../types/game';
+import { useGameStore } from '../../store/gameStore';
 
 const QUESTION_TIME_SECONDS = 15;
 
@@ -39,6 +40,7 @@ export function GameScreen() {
     const [timeLeft, setTimeLeft] = useState(QUESTION_TIME_SECONDS);
     const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
     const [isResolvingAnswer, setIsResolvingAnswer] = useState(false);
+    const completeLevel = useGameStore((state: any) => state.completeLevel);
 
     const [usedPowerUps, setUsedPowerUps] = useState({
         fiftyFifty: false,
@@ -141,7 +143,7 @@ export function GameScreen() {
                 // SIN VIDAS = DERROTA
                 // =========================
                 if (remainingLives <= 0) {
-                    navigate(`/level-complete/${levelId}`, {
+                    navigate(`/level-failed/${levelId}`, {
                         replace: true
                     });
 
@@ -152,6 +154,7 @@ export function GameScreen() {
                 // ÚLTIMA PREGUNTA
                 // =========================
                 if (questionIndex >= questions.length - 1) {
+                    completeLevel(levelId, progress.score + (isCorrect ? 100 : 0));
                     navigate(`/level-complete/${levelId}`, {
                         replace: true
                     });

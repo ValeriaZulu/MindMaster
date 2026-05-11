@@ -10,7 +10,7 @@ type MobileLayoutProps = {
 }
 
 const navItems = [
-    { to: '/levels', label: 'Jugar', icon: 'play' },
+    { to: '/Home', label: 'Jugar', icon: 'play' },
     { to: '/ranking', label: 'Ranking', icon: 'trophy' },
     { to: '/profile', label: 'Perfil', icon: 'user' },
 ]

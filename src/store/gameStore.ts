@@ -128,35 +128,44 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
 
     // IMPLEMENTACIÓN COMPLETA DE PROGRESIÓN
     completeLevel: async (levelId, score) => {
-        const { user, progress, coins } = get()
-        // Verificamos que el usuario y su ID existan para evitar errores
-        if (!user || !user.uid) return
+        const { user, progress, coins } = get();
 
-        const levelOrder: LevelId[] = ['novato', 'aprendiz', 'experto']
-        const currentIndex = levelOrder.indexOf(levelId)
-        const nextLevelId = levelOrder[currentIndex + 1] || levelId
+        // 1. Lógica de progresión (esto debe ejecutarse SIEMPRE)
+        const levelOrder: LevelId[] = ['novato', 'aprendiz', 'experto'];
+        const currentIndex = levelOrder.indexOf(levelId);
 
-        const nextCoins = coins + 50
-        const nextBestScore = Math.max(user.bestScore, score)
+        // Calculamos el siguiente nivel
+        const nextLevelId = levelOrder[currentIndex + 1] || levelId;
 
-        const nextUser = { ...user, bestScore: nextBestScore, coins: nextCoins }
-        const nextProgress = { ...progress, currentLevel: nextLevelId }
+        // Actualizamos el progreso local
+        const nextProgress = {
+            ...progress,
+            currentLevel: nextLevelId
+        };
 
-        set({ user: nextUser, progress: nextProgress, coins: nextCoins })
-        saveToStorage(USER_STORAGE_KEY, nextUser)
-        saveToStorage(PROGRESS_STORAGE_KEY, nextProgress)
+        // Actualizamos el estado y el storage local de una vez
+        set({ progress: nextProgress });
+        saveToStorage(PROGRESS_STORAGE_KEY, nextProgress);
 
-        try {
-            // Usamos la exclamación db! para el error de Firestore
-            const userRef = doc(db!, 'users', user.uid)
-            await updateDoc(userRef, {
-                bestScore: nextBestScore,
-                coins: nextCoins,
-                currentLevel: nextLevelId,
-                completedLevels: arrayUnion(levelId)
-            })
-        } catch (e) {
-            console.error("Error sincronizando:", e)
+        // 2. Lógica de Usuario y Firebase (Solo si existe el usuario)
+        if (user && user.uid) {
+            const nextBestScore = Math.max(user.bestScore, score);
+            // Aquí no sumamos monedas porque ya las sumas en la pantalla de LevelComplete
+            const nextUser = { ...user, bestScore: nextBestScore };
+
+            set({ user: nextUser });
+            saveToStorage(USER_STORAGE_KEY, nextUser);
+
+            try {
+                const userRef = doc(db!, 'users', user.uid);
+                await updateDoc(userRef, {
+                    bestScore: nextBestScore,
+                    currentLevel: nextLevelId,
+                    completedLevels: arrayUnion(levelId)
+                });
+            } catch (e) {
+                console.error("Error sincronizando con Firebase:", e);
+            }
         }
     },
     answerCorrect: () => {
