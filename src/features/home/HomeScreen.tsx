@@ -16,12 +16,12 @@ export function HomeScreen() {
     const [brainClicks, setBrainClicks] = useState(0)
     const [easterEggFound, setEasterEggFound] = useState(false)
 
-    // Extraemos datos anidados según la estructura de tu gameStore.ts
+    // Extraemos datos anidados según la estructura de gameStore.ts
     const bestScore = useGameStore((state) => state.user?.bestScore) || 0
     const currentLevelId = useGameStore((state) => state.progress.currentLevel) || 'Novato'
 
-    // Dato estático para la racha (puedes implementarlo luego en el store si quieres)
-    const dailyStreak = 5
+    // Dato estático para la racha 
+    //const dailyStreak = 5
 
     const handleBrainClick = () => {
         if (easterEggFound) return

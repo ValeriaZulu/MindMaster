@@ -50,7 +50,7 @@ export function CreditsScreen() {
                 <div className="flex flex-col items-center gap-3">
                     <div
                         onClick={handleLogoClick}
-                        className="flex h-24 w-24 cursor-pointer items-center justify-center overflow-hidden rounded-full border border-master-border bg-master-surface shadow-sm transition-transform active:scale-95" style={{ transform: `rotate(${logoClicks * 10}deg)` }}
+                        className="flex h-24 w-24 cursor-pointer items-center justify-center overflow-hidden rounded-full border border-master-border bg-master-surface shadow-sm transition-transform active:scale-95 shadow-neon" style={{ transform: `rotate(${logoClicks * 10}deg)` }}
                     >
                         <img
                             src="/logo.png"

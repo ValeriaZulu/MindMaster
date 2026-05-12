@@ -100,11 +100,12 @@ export function SplashScreen() {
             <div className="flex h-screen flex-col items-center justify-between px-10 pt-20 pb-16 bg-master-bg transition-colors duration-300">
 
                 {/* SECCIÓN SUPERIOR: Logo y Títulos */}
+                {/* SECCIÓN SUPERIOR: Logo y Títulos */}
                 <div className="flex flex-col items-center gap-4 w-full">
                     <img
                         src="/logo.png"
                         alt="MindMaster Logo"
-                        className="h-32 w-32 object-contain mb-6"
+                        className="h-32 w-32 object-cover mb-6 rounded-full border-master-accent/30 bg-master-surface shadow-neon"
                     />
                     <h1 className="text-5xl font-extrabold text-master-primary tracking-tight">MindMaster</h1>
                     <p className="text-xl text-master-muted font-medium text-center">Libera tu potencial mental</p>
