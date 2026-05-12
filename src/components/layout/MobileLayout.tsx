@@ -1,4 +1,4 @@
-import { Link, NavLink } from 'react-router-dom'
+import { NavLink } from 'react-router-dom'
 import type { ReactNode } from 'react'
 
 type MobileLayoutProps = {
@@ -17,8 +17,16 @@ const navItems = [
 
 export function MobileLayout({ title, subtitle, showNavigation = true, showHeader = true, children }: MobileLayoutProps) {
     return (
-        <main className="min-h-screen bg-master-bg px-4 py-4 text-master-text sm:px-6">
-            <section className="mx-auto flex min-h-[calc(100vh-2rem)] w-full max-w-md flex-col overflow-hidden rounded-[2rem] border border-master-border bg-master-surface shadow-[var(--app-shadow)] backdrop-blur-xl">
+        /* Eliminamos el padding lateral y vertical en móvil para que no sobren bordes */
+        <main className="min-h-screen bg-master-bg text-master-text">
+
+            {/* - h-screen: Ocupa toda la altura en el celular.
+                - sm:h-[calc(100vh-2rem)]: En PC vuelve a ser un contenedor con margen.
+                - sm:my-4: Añade el margen arriba/abajo solo en pantallas grandes.
+                - sm:rounded-[2rem] y sm:border: El diseño redondeado solo se aplica en PC.
+            */}
+            <section className="mx-auto flex h-screen w-full max-w-md flex-col overflow-hidden bg-master-surface shadow-[var(--app-shadow)] backdrop-blur-xl sm:my-4 sm:h-[calc(100vh-2rem)] sm:rounded-[2rem] sm:border sm:border-master-border">
+
                 {showHeader ? (
                     <header className="flex items-center justify-between border-b border-master-border px-5 py-4">
                         <div>
@@ -29,7 +37,10 @@ export function MobileLayout({ title, subtitle, showNavigation = true, showHeade
                     </header>
                 ) : null}
 
-                <div className="flex-1 overflow-y-auto px-5 py-5">{children}</div>
+                {/* El área de contenido ahora tiene un scroll interno independiente */}
+                <div className="flex-1 overflow-y-auto px-5 py-5">
+                    {children}
+                </div>
 
                 {showNavigation ? (
                     <nav className="grid grid-cols-3 gap-2 border-t border-master-border bg-master-surface-strong px-3 py-3 text-center text-xs font-semibold text-master-muted">
@@ -44,7 +55,6 @@ export function MobileLayout({ title, subtitle, showNavigation = true, showHeade
                                 }
                                 to={item.to}
                             >
-                                {/* Inline simple icons */}
                                 {item.icon === 'play' ? (
                                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                                         <path d="M5 3v18l15-9L5 3z" fill="currentColor" />
