@@ -1,11 +1,11 @@
 import { MobileLayout } from '../../components/layout/MobileLayout'
 import { useRanking } from '../../hooks/useRanking'
 import { useGameStore } from '../../store/gameStore'
-import { MdEmojiEvents, MdLeaderboard } from 'react-icons/md'
+import { MdLeaderboard } from 'react-icons/md'
 
 export function RankingScreen() {
     const currentUser = useGameStore((state) => state.user)
-    const { ranking, isLoading, error, refresh } = useRanking()
+    const { ranking, isLoading, error } = useRanking()
 
     const top1 = ranking[0]
     const top2 = ranking[1]
