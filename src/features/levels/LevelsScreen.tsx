@@ -7,16 +7,13 @@ import { LevelId } from '../../types/game'
 export function LevelsScreen() {
     const navigate = useNavigate()
     const levelList = Object.values(TRIVIA_LEVELS)
-
-    // 1. Obtenemos el nivel actual desde el store
-    const currentLevelId = useGameStore((state) => state.progress.currentLevel) || 'novato'
-
-    // 2. Definimos el mismo orden que en el store para comparar índices
     const levelOrder: LevelId[] = ['novato', 'aprendiz', 'experto']
-    const currentIndex = levelOrder.indexOf(currentLevelId as LevelId)
 
-    // 3. Calculamos el porcentaje real para la barra de progreso
-    const progressPercentage = (currentIndex / (levelOrder.length - 1)) * 100
+    const completedLevels = useGameStore((state) => state.user?.completedLevels || []);
+    const currentLevelId = useGameStore((state) => state.progress.currentLevel) || 'novato';
+    const currentIndex = levelOrder.indexOf(currentLevelId as LevelId);
+    const totalLevels = levelOrder.length;
+    const progressPercentage = (completedLevels.length / totalLevels) * 100;
 
     return (
         <MobileLayout title="" showHeader={false} showNavigation={false}>

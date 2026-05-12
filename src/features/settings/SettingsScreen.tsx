@@ -22,6 +22,7 @@ export function SettingsScreen() {
     const setTheme = useGameStore((state) => state.setTheme)
     const toggleSound = useGameStore((state) => state.toggleSound)
     const toggleMusic = useGameStore((state) => state.toggleMusic)
+    const resetStore = useGameStore((state) => state.resetStore)
 
     const isDarkMode = settings.theme === 'dark'
 
@@ -211,6 +212,7 @@ export function SettingsScreen() {
                     {/* Botón de Cerrar Sesión */}
                     <button
                         onClick={() => {
+                            resetStore();
                             signOut();
                             navigate('/');
                         }}
