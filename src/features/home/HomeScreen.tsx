@@ -1,11 +1,20 @@
 import { Link } from 'react-router-dom'
+import { useState } from 'react'
 import { MobileLayout } from '../../components/layout/MobileLayout'
 import { useGameStore } from '../../store/gameStore'
+import confetti from 'canvas-confetti';
+
 
 export function HomeScreen() {
     // Extraemos los datos base del store
     const userName = useGameStore((state) => state.userName)
+    const user = useGameStore((state) => state.user)
     const coins = useGameStore((state) => state.coins)
+
+    const addCoins = useGameStore((state) => state.addCoins)
+
+    const [brainClicks, setBrainClicks] = useState(0)
+    const [easterEggFound, setEasterEggFound] = useState(false)
 
     // Extraemos datos anidados según la estructura de tu gameStore.ts
     const bestScore = useGameStore((state) => state.user?.bestScore) || 0
@@ -14,6 +23,25 @@ export function HomeScreen() {
     // Dato estático para la racha (puedes implementarlo luego en el store si quieres)
     const dailyStreak = 5
 
+    const handleBrainClick = () => {
+        if (easterEggFound) return
+
+        const nextClicks = brainClicks + 1
+        setBrainClicks(nextClicks)
+
+        if (nextClicks >= 3) {
+            addCoins(50)
+            setEasterEggFound(true)
+            confetti({
+                particleCount: 150,
+                spread: 70,
+                origin: { y: 0.6 },
+                colors: ['#6D4AFF', '#007A43', '#FFD700']
+            });
+
+        }
+    }
+
     return (
         <MobileLayout title="Inicio" showHeader={false} showNavigation={true}>
             <div className="flex flex-col gap-6 pb-24">
@@ -21,14 +49,21 @@ export function HomeScreen() {
                 {/* HEADER: Usuario, Monedas y Nombre App */}
                 <div className="flex items-center justify-between pt-4 px-2">
                     <div className="flex items-center gap-3">
-                        <div className="h-12 w-12 rounded-full border-2 border-master-primary bg-master-surface overflow-hidden shadow-sm flex items-center justify-center text-2xl">
-                            {/* Puedes usar un emoji o un placeholder mientras configuras las fotos de perfil */}
-                            👤
+                        <div className="h-12 w-12 rounded-full border-2 border-master-primary shadow-neon bg-master-surface overflow-hidden shadow-sm">
+                            <img
+                                alt="Perfil"
+                                className="h-full w-full object-cover"
+                                src={
+                                    user?.photoURL ||
+                                    `https://api.dicebear.com/7.x/notionists/svg?seed=${encodeURIComponent(
+                                        userName || 'User'
+                                    )}`
+                                }
+                            />
                         </div>
                         <div className="flex flex-col">
-                            <span className="text-[10px] font-black text-master-muted uppercase tracking-tighter leading-none">Usuario</span>
                             <span className="text-sm font-bold text-master-text truncate max-w-[80px]">{userName || 'Invitado'}</span>
-                            <div className="flex items-center gap-1 text-master-primary font-black text-xs">
+                            <div className="text-yellow-500 font-bold flex items-center gap-1 text-master-primary font-black text-xs">
                                 <span>$</span>
                                 <span>{coins.toLocaleString()}</span>
                             </div>
@@ -39,16 +74,23 @@ export function HomeScreen() {
 
                 {/* CARD PRINCIPAL: Invitación al juego */}
                 <div className="relative overflow-hidden rounded-[2.5rem] bg-master-surface p-8 shadow-app border border-master-border flex flex-col items-center text-center gap-6">
-                    <div className="relative">
+                    <div
+                        className="relative cursor-pointer active:scale-95 transition-transform"
+                        onClick={handleBrainClick}
+                    >
                         <div className="h-24 w-24 bg-master-primary/10 rounded-full flex items-center justify-center border border-master-primary/20">
                             <span className="text-5xl">🧠</span>
                         </div>
-                        <span className="absolute -top-1 -right-1 bg-master-accent text-[10px] font-black px-2 py-1 rounded-lg text-white shadow-neon animate-bounce">NUEVO</span>
                     </div>
 
                     <div className="space-y-1">
                         <h2 className="text-3xl font-extrabold text-master-text tracking-tight">¿Listo para el desafío?</h2>
                         <p className="text-master-muted font-medium text-sm">Pon a prueba tus conocimientos hoy</p>
+                        {easterEggFound && (
+                            <p className="text-yellow-500 font-bold text-sm animate-pulse">
+                                🪺 Easter Egg: + 50 monedas
+                            </p>
+                        )}
                     </div>
 
                     <Link
@@ -80,7 +122,7 @@ export function HomeScreen() {
                 <div className="mt-2 space-y-4">
                     <div className="flex items-center justify-between px-2">
                         <h3 className="text-xl font-bold text-master-text tracking-tight">Tu Progreso</h3>
-                        <Link to="/profile" className="text-[10px] font-black text-master-primary uppercase tracking-widest bg-master-primary/10 px-2 py-1 rounded-md">Ver todo</Link>
+                        <Link to="/profile" className="flex items-center justify-center text-[10px] font-black text-master-primary uppercase tracking-widest bg-master-primary/10 px-2 h-6 rounded-md">Ver todo</Link>
                     </div>
 
                     <div className="space-y-3">

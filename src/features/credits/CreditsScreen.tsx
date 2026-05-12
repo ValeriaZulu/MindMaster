@@ -1,34 +1,71 @@
 import { useNavigate } from 'react-router-dom'
-import { MdArrowBack, MdPsychology, MdPerson, MdSchool, MdCode, MdStorage } from 'react-icons/md'
+import { MdArrowBack, MdPerson, MdSchool, MdCode, MdStorage } from 'react-icons/md'
 import { MobileLayout } from '../../components/layout/MobileLayout'
+import { useState } from 'react'
+import confetti from 'canvas-confetti'
 
 export function CreditsScreen() {
     const navigate = useNavigate()
+    const [logoClicks, setLogoClicks] = useState(0)
+    const [secretFound, setSecretFound] = useState(false)
+
+    const handleLogoClick = () => {
+        if (secretFound) return;
+
+        // Usamos una variable local para la lógica inmediata
+        const currentClicks = logoClicks + 1;
+        setLogoClicks(currentClicks);
+
+        if (currentClicks >= 5) {
+            setSecretFound(true);
+            confetti({
+                particleCount: 200,
+                spread: 100,
+                origin: { y: 0.6 }
+            });
+        }
+    };
 
     return (
         <MobileLayout title="Créditos" showHeader={false}>
             {/* Top Navigation */}
-            <header className="sticky top-0 z-40 flex w-full items-center justify-between bg-master-bg/80 px-2 py-4 backdrop-blur-md">
-                <button
-                    onClick={() => navigate(-1)}
-                    className="flex items-center gap-2 rounded-xl p-2 text-master-muted transition-colors hover:bg-master-surface/50 active:scale-95"
-                >
-                    <MdArrowBack className="text-xl" />
-                    <span className="font-semibold text-master-text">Volver</span>
-                </button>
-                <span className="text-2xl font-bold text-master-primary">Créditos</span>
-                <div className="w-20"></div> {/* Spacer for centering */}
-            </header>
+            <header className="sticky top-0 z-40 flex w-full items-center justify-between px-2 py-4 backdrop-blur-md">
+                <div className="flex items-center gap-3">
+                    <button
+                        onClick={() => navigate(-1)}
+                        className="flex h-10 w-10 items-center justify-center rounded-full text-xl text-master-muted transition-colors hover:bg-master-surface/50 active:scale-95"
+                    >
+                        <MdArrowBack />
+                    </button>
 
+                    <h1 className="text-3xl font-bold text-master-primary">
+                        MindMaster
+                    </h1>
+                </div>
+                <div className="flex items-center justify-center p-2 text-2xl text-master-primary/80">
+                    👥
+                </div>
+            </header>
             <div className="flex-grow space-y-6 px-1 pb-10 pt-4">
-                {/* Hero Brain Illustration */}
                 <div className="flex flex-col items-center gap-3">
-                    <div className="flex h-24 w-24 items-center justify-center rounded-full border border-master-border bg-master-surface shadow-sm">
-                        <MdPsychology className="text-6xl text-master-primary" />
+                    <div
+                        onClick={handleLogoClick}
+                        className="flex h-24 w-24 cursor-pointer items-center justify-center overflow-hidden rounded-full border border-master-border bg-master-surface shadow-sm transition-transform active:scale-95" style={{ transform: `rotate(${logoClicks * 10}deg)` }}
+                    >
+                        <img
+                            src="/logo.png"
+                            alt="MindMaster Logo"
+                            className="h-full w-full object-cover"
+                        />
                     </div>
                     <div className="text-center">
                         <h1 className="text-3xl font-bold text-master-primary">MindMaster</h1>
                         <p className="mt-1 text-sm font-medium text-master-muted text-balance mt-2">Proyecto académico — React / TypeScript</p>
+                        {secretFound && (
+                            <p className="mt-3 text-center text-sm font-bold text-yellow-500 animate-pulse">
+                                🪺 Easter Egg: Gracias por jugar MindMaster
+                            </p>
+                        )}
                     </div>
                 </div>
 
