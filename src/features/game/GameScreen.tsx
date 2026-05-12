@@ -25,7 +25,7 @@ export function GameScreen() {
 
     const { coins, activateFiftyFifty, activateSkipQuestion } = usePowerUp();
 
-    const { playEffect } = useSound();
+    const { playEffect, startBackgroundMusic, stopBackgroundMusic } = useSound();
 
     const game = useGameLogic();
 
@@ -56,6 +56,16 @@ export function GameScreen() {
         startLevel(levelId);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [levelId]);
+
+    useEffect(() => {
+        // Al montar el componente (empezar la partida)
+        startBackgroundMusic();
+
+        // Función de limpieza: se ejecuta al desmontar (salir de la pantalla)
+        return () => {
+            stopBackgroundMusic();
+        };
+    }, [startBackgroundMusic, stopBackgroundMusic]);
 
     // =========================
     // CARGAR PREGUNTAS
@@ -143,6 +153,7 @@ export function GameScreen() {
                 // SIN VIDAS = DERROTA
                 // =========================
                 if (remainingLives <= 0) {
+                    playEffect('failed');
                     navigate(`/level-failed/${levelId}`, {
                         replace: true
                     });
@@ -154,6 +165,7 @@ export function GameScreen() {
                 // ÚLTIMA PREGUNTA
                 // =========================
                 if (questionIndex >= questions.length - 1) {
+                    playEffect('complete');
                     completeLevel(levelId, progress.score + (isCorrect ? 100 : 0));
                     navigate(`/level-complete/${levelId}`, {
                         replace: true
@@ -337,6 +349,7 @@ export function GameScreen() {
                             typeof res === 'object' &&
                             'options' in res
                         ) {
+                            playEffect('powerup');
                             setDisplayOptions(res.options);
 
                             setUsedPowerUps((prev) => ({
@@ -377,6 +390,7 @@ export function GameScreen() {
                             });
 
                         if (success) {
+                            playEffect('powerup');
                             setUsedPowerUps((prev) => ({
                                 ...prev,
                                 skipQuestion: true
