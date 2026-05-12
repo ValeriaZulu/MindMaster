@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { MdArrowBack, MdSettings, MdEdit, MdEmojiEvents, MdTrendingUp, MdDarkMode, MdLightMode, MdVolumeUp, MdVolumeOff, MdMusicNote, MdMusicOff, MdLogout, MdCheck, MdClose } from 'react-icons/md'
+import { MdArrowBack, MdSettings, MdEdit, MdEmojiEvents, MdTrendingUp, MdDarkMode, MdLightMode, MdVolumeUp, MdVolumeOff, MdMusicNote, MdMusicOff, MdLogout, MdCheck, MdClose, MdInfoOutline } from 'react-icons/md'
 import { MobileLayout } from '../../components/layout/MobileLayout'
 import { useGameStore } from '../../store/gameStore'
 import { useAuth } from '../../hooks/useAuth'
@@ -198,7 +198,17 @@ export function SettingsScreen() {
                     </div>
                 </section>
 
-                <section className="pt-4 pb-12">
+                <section className="pt-4 pb-12 space-y-2">
+                    {/* Botón de Créditos */}
+                    <button
+                        onClick={() => navigate('/credits')} // Ajusta la ruta si es diferente
+                        className="flex w-full items-center justify-center gap-2 rounded-xl p-4 text-master-primary transition-colors hover:bg-master-primary/10 font-bold text-xl"
+                    >
+                        <MdInfoOutline />
+                        <span>Créditos</span>
+                    </button>
+
+                    {/* Botón de Cerrar Sesión */}
                     <button
                         onClick={() => {
                             signOut();

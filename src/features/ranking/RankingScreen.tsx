@@ -1,6 +1,7 @@
 import { MobileLayout } from '../../components/layout/MobileLayout'
 import { useRanking } from '../../hooks/useRanking'
 import { useGameStore } from '../../store/gameStore'
+import { MdEmojiEvents, MdLeaderboard } from 'react-icons/md'
 
 export function RankingScreen() {
     const currentUser = useGameStore((state) => state.user)
@@ -17,11 +18,37 @@ export function RankingScreen() {
     const getAvatar = (name: string) => `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(name)}&backgroundColor=b6e3f4,c0aede,d1d4f9`
 
     return (
-        <MobileLayout title="Ranking mundial" subtitle="Compite con las mentes más brillantes del mundo.">
+        <MobileLayout
+            showHeader={false} // Desactivamos el header por defecto para hacer el nuestro
+            title="Ranking"
+        >
+            {/* Cabecera Personalizada Centrada */}
+            <header className="relative flex flex-col items-center justify-center py-8 px-4">
+                {/* Icono decorativo de fondo (opcional, para que no empuje el texto) */}
+                <MdLeaderboard className="absolute left-6 top-10 text-4xl text-master-primary/10 rotate-12" />
+
+                <h1 className="text-[10px] font-black uppercase tracking-[0.3em] text-master-primary/70 mb-1">
+                    MindMaster
+                </h1>
+
+                <div className="text-center">
+                    <h2 className="text-4xl font-black text-master-text leading-tight">
+                        Ranking <br />
+                        <span className="text-master-primary">Mundial</span>
+                    </h2>
+                </div>
+
+                <p className="mt-2 text-xs font-medium text-master-muted text-center italic">
+                    "Compite con las mentes más brillantes"
+                </p>
+            </header>
+
             <div className="space-y-6 pb-6">
-
-                {error ? <p className="rounded-xl bg-amber-100/80 px-3 py-2 text-sm font-semibold text-amber-900">{error}</p> : null}
-
+                {error ? (
+                    <p className="rounded-xl bg-amber-100/80 px-3 py-2 text-sm font-semibold text-amber-900 text-center">
+                        {error}
+                    </p>
+                ) : null}
                 {/* Podium */}
                 {ranking.length > 0 && (
                     <div className="grid grid-cols-3 gap-3 items-end">
