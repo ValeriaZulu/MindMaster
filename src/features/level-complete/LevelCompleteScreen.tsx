@@ -5,6 +5,7 @@ import { buildRewardSignature, hasRewardBeenGranted, markRewardGranted, useEcono
 import { useSound } from '../../hooks/useSound'
 import { TRIVIA_LEVELS } from '../../hooks/useTrivia'
 import { useGameStore } from '../../store/gameStore'
+import confetti from 'canvas-confetti';
 
 export function LevelCompleteScreen() {
     const params = useParams()
@@ -40,6 +41,12 @@ export function LevelCompleteScreen() {
             try {
                 await addCoins(level.rewardCoins);
                 playEffect('complete');
+                confetti({
+                    particleCount: 150,
+                    spread: 70,
+                    origin: { y: 0.6 },
+                    colors: ['#6D4AFF', '#007A43', '#FFD700']
+                });
                 markRewardGranted(rewardSignature);
                 if (isMounted) setRewardGranted(true);
             } catch (error) {
